@@ -7,6 +7,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
 import { playShootSound, playJumpSound } from '../utils/audio';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
+import { sampleShake } from '../game/shake';
 
 const JUMP_FORCE = 15;
 
@@ -16,6 +17,7 @@ const _moveVel = new THREE.Vector3();
 const _downRayDir = new THREE.Vector3(0, -1, 0);
 const _downRaycaster = new THREE.Raycaster();
 const _rayOrigin = new THREE.Vector3();
+const _shake = { x: 0, y: 0, z: 0 };
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
 
@@ -115,7 +117,14 @@ export const Player = () => {
     } else {
       camera.position.set(currentPos.x, currentPos.y + 0.8, currentPos.z); // Eye level
     }
-    
+
+    // Screen-shake as a positional offset, applied AFTER camera placement so it
+    // never fights PointerLockControls (which owns yaw/pitch). See game/shake.ts.
+    sampleShake(delta, _shake);
+    camera.position.x += _shake.x;
+    camera.position.y += _shake.y;
+    camera.position.z += _shake.z;
+
     if (weaponRef.current) {
       weaponRef.current.visible = !isThirdPerson;
     }

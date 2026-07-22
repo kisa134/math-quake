@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as THREE from 'three';
+import { addTrauma } from './game/shake';
 
 interface Enemy {
   id: string;
@@ -37,6 +38,17 @@ interface DebrisChunk {
   color: string;
   size: number;
   createdAt: number;
+  rx?: number; ry?: number; rz?: number;   // current rotation (rad)
+  sx?: number; sy?: number; sz?: number;   // spin velocity (rad/s)
+  life?: number;                           // seconds to live
+}
+
+// Transient "an enemy just died" pulse — the juice layer (Debris) reads it,
+// compares the timestamp, and fires shake + sound once per death.
+interface DeathFx {
+  x: number; y: number; z: number;
+  big: boolean;
+  t: number;
 }
 
 interface PlayerState {
@@ -59,6 +71,7 @@ interface GameState {
   projectiles: Projectile[];
   damageNumbers: DamageNumber[];
   debris: DebrisChunk[];
+  lastDeathFx: DeathFx | null;
   isPlaying: boolean;
   roomId: string;
   playerId: string | null;
@@ -90,6 +103,52 @@ interface GameState {
 
 const SHAPES: ('torus' | 'torusKnot' | 'icosahedron' | 'octahedron' | 'dodecahedron' | 'candle')[] = ['torus', 'torusKnot', 'icosahedron', 'octahedron', 'dodecahedron', 'candle'];
 
+// ---- Voxel destruction (see docs/increments/02-voxel-destruction.md) ----
+const DEBRIS_CAP = 256;
+const SMALL_COUNT = 10, CANDLE_COUNT = 18;
+const RADIAL = 12, SCATTER = 8, POP_UP = 6, SPIN = 8;
+const NEON = ['#f72585', '#00f5d4', '#4361ee', '#7209b7', '#4cc9f0', '#b5179e'];
+
+const colorForEnemy = (e: Enemy): string =>
+  e.type === 'candle'
+    ? (Math.random() > 0.5 ? '#00f5d4' : '#f72585')
+    : NEON[Math.floor(Math.random() * NEON.length)];
+
+// Pre-fractured voxel chunks launched radially away from the impact point.
+function makeChunks(enemy: Enemy, impact: [number, number, number]): DebrisChunk[] {
+  const isCandle = enemy.type === 'candle';
+  const count = isCandle ? CANDLE_COUNT : SMALL_COUNT;
+  const [cx, cy, cz] = enemy.position;
+  const baseHalf = isCandle ? 1.5 : 1;
+  const color = colorForEnemy(enemy);
+  const now = Date.now();
+  const out: DebrisChunk[] = [];
+  for (let i = 0; i < count; i++) {
+    const px = cx + (Math.random() - 0.5) * baseHalf * 2;
+    const py = cy + (isCandle ? Math.random() * 5 : (Math.random() - 0.5) * baseHalf * 2);
+    const pz = cz + (Math.random() - 0.5) * baseHalf * 2;
+    let dx = px - impact[0], dy = py - impact[1], dz = pz - impact[2];
+    const len = Math.hypot(dx, dy, dz) || 1;
+    dx /= len; dy /= len; dz /= len;
+    out.push({
+      id: Math.random().toString(36).substring(2, 9),
+      x: px, y: py, z: pz,
+      vx: dx * RADIAL + (Math.random() - 0.5) * SCATTER,
+      vy: dy * RADIAL + (Math.random() - 0.5) * SCATTER + POP_UP,
+      vz: dz * RADIAL + (Math.random() - 0.5) * SCATTER,
+      color,
+      size: baseHalf * (0.25 + Math.random() * 0.35),
+      createdAt: now,
+      rx: 0, ry: 0, rz: 0,
+      sx: (Math.random() - 0.5) * 2 * SPIN,
+      sy: (Math.random() - 0.5) * 2 * SPIN,
+      sz: (Math.random() - 0.5) * 2 * SPIN,
+      life: isCandle ? 2.8 : 2.5,
+    });
+  }
+  return out;
+}
+
 export const useStore = create<GameState>((set) => ({
   score: 0,
   health: 100,
@@ -97,6 +156,7 @@ export const useStore = create<GameState>((set) => ({
   projectiles: [],
   damageNumbers: [],
   debris: [],
+  lastDeathFx: null,
   isPlaying: false,
   roomId: '',
   playerId: null,
@@ -166,36 +226,30 @@ export const useStore = create<GameState>((set) => ({
     let newDebris = state.debris || [];
     const aliveEnemies = enemies.filter(e => e.health > 0);
     const deadEnemies = enemies.filter(e => e.health <= 0);
-    
+
+    // Every dead enemy shatters into voxels, blown away from the impact point.
     deadEnemies.forEach(e => {
-      if (e.type === 'candle') {
-        const color = Math.random() > 0.5 ? '#00f5d4' : '#f72585';
-        const chunks = Array(12).fill(0).map(() => ({
-          x: e.position[0] + (Math.random() - 0.5) * 2,
-          y: e.position[1] + Math.random() * 5,
-          z: e.position[2] + (Math.random() - 0.5) * 2,
-          vx: (Math.random() - 0.5) * 15,
-          vy: Math.random() * 20,
-          vz: (Math.random() - 0.5) * 15,
-          color,
-          size: 0.5 + Math.random() * 1.5,
-        }));
-        
-        newDebris = [...newDebris, ...chunks.map(c => ({
-          ...c,
-          id: Math.random().toString(36).substring(2, 9),
-          createdAt: Date.now()
-        }))];
-      }
+      const impact = pos ?? e.position;
+      newDebris = newDebris.concat(makeChunks(e, impact));
     });
+    if (newDebris.length > DEBRIS_CAP) {
+      newDebris = newDebris.slice(newDebris.length - DEBRIS_CAP);
+    }
+
+    // Death-FX pulse for the juice layer (last dead this frame wins — fine).
+    const dead = deadEnemies[deadEnemies.length - 1];
+    const lastDeathFx: DeathFx | null = dead
+      ? { x: dead.position[0], y: dead.position[1], z: dead.position[2], big: dead.type === 'candle', t: Date.now() }
+      : state.lastDeathFx;
 
     const scoreGain = deadEnemies.length * 10;
-    
+
     return {
       enemies: aliveEnemies,
       score: state.score + scoreGain,
       damageNumbers: newDamageNumbers,
-      debris: newDebris
+      debris: newDebris,
+      lastDeathFx,
     };
   }),
   
@@ -204,6 +258,7 @@ export const useStore = create<GameState>((set) => ({
   })),
   
   takeDamage: (amount) => set((state) => {
+    addTrauma(0.3); // getting hit kicks the camera
     const newHealth = Math.max(0, state.health - amount);
     if (newHealth === 0) {
       return { health: 0, isPlaying: false };

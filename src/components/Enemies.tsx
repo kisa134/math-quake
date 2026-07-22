@@ -1,8 +1,9 @@
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RigidBody } from '@react-three/rapier';
 import { useStore } from '../store';
+import { Debris } from './Debris';
 
 const _enemyPos = new THREE.Vector3();
 const _enemyDir = new THREE.Vector3();
@@ -100,31 +101,13 @@ const EnemyMesh = ({ id, position, type }: { id: string, position: [number, numb
 
 export const Enemies = () => {
   const enemies = useStore((s) => s.enemies);
-  const debris = useStore((s) => s.debris);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      useStore.setState(s => ({
-        debris: s.debris.filter(d => now - d.createdAt < 5000)
-      }));
-    }, 2000);
-    return () => clearInterval(interval);
-  }, []);
 
   return (
     <>
       {enemies.map((e) => (
         <EnemyMesh key={e.id} {...e} />
       ))}
-      {debris.map((d) => (
-        <RigidBody key={d.id} position={[d.x, d.y, d.z]} linearVelocity={[d.vx, d.vy, d.vz]} colliders="cuboid" type="dynamic" mass={0.2}>
-          <mesh castShadow receiveShadow>
-            <boxGeometry args={[d.size, d.size, d.size]} />
-            <meshStandardMaterial color={d.color} />
-          </mesh>
-        </RigidBody>
-      ))}
+      <Debris />
     </>
   );
 };
