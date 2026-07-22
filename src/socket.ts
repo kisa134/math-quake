@@ -56,7 +56,7 @@ export const initMultiplayer = (roomId: string) => {
 
   socket.on("score_updated", (data) => {
     if (data.id === useStore.getState().playerId) {
-      useStore.getState().score = data.score;
+      useStore.setState({ score: data.score }); // was a direct mutation → never re-rendered
     } else {
       useStore.getState().updateRemotePlayer(data.id, { score: data.score });
     }

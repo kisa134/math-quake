@@ -6,7 +6,7 @@ import { Server } from "socket.io";
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 3000; // Render/hosts inject PORT
   const httpServer = createServer(app);
   const io = new Server(httpServer, {
     cors: {

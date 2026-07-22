@@ -1,0 +1,18 @@
+# Render blueprint — deploys Math Quake as a persistent Node service.
+# One process (dist/server.cjs) serves BOTH the built client and the
+# authoritative socket.io world tick. Render injects $PORT (server.ts reads
+# process.env.PORT). --include=dev is required because the build needs esbuild
+# + tsx, which live in devDependencies (Render installs with NODE_ENV=production
+# and would otherwise skip them).
+services:
+  - type: web
+    name: math-quake
+    runtime: node
+    plan: free
+    buildCommand: npm install --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
