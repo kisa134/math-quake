@@ -1,7 +1,9 @@
 import { useStore } from '../store';
 import { initAudio } from '../utils/audio';
 import { initMultiplayer } from '../socket';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import type { CSSProperties } from 'react';
+import { onHitmarker } from '../game/fx';
 
 export const UI = () => {
   const { score, health, isPlaying, startGame, roomId, setRoomId, currentWeapon } = useStore();
@@ -50,6 +52,8 @@ export const UI = () => {
               <div className="absolute -right-20 top-1/2 -translate-y-1/2 text-[10px] font-mono text-emerald-400">φ: 3.141</div>
             </div>
           </div>
+
+          <Hitmarker />
 
           {/* Peripheral HUD Elements */}
           <div className="absolute top-1/2 left-8 -translate-y-1/2 flex flex-col gap-4 opacity-50">
@@ -154,6 +158,42 @@ export const UI = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// Center hitmarker — a quick white X that pops on every landed shot.
+const Hitmarker = () => {
+  const [id, setId] = useState(0);
+  useEffect(() => onHitmarker(() => setId((x) => x + 1)), []);
+  if (!id) return null;
+  return <HitmarkerFlash key={id} />;
+};
+
+const HitmarkerFlash = () => {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setOn(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+  const bar: CSSProperties = {
+    position: 'absolute',
+    left: '50%',
+    top: '50%',
+    width: 18,
+    height: 3,
+    marginLeft: -9,
+    marginTop: -1.5,
+    background: '#ffffff',
+    borderRadius: 2,
+    boxShadow: '0 0 6px rgba(255,255,255,0.9)',
+    transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+    opacity: on ? 0 : 1,
+  };
+  return (
+    <div className="absolute inset-0 pointer-events-none">
+      <div style={{ ...bar, transform: `rotate(45deg) scale(${on ? 0.9 : 1.5})` }} />
+      <div style={{ ...bar, transform: `rotate(-45deg) scale(${on ? 0.9 : 1.5})` }} />
     </div>
   );
 };

@@ -19,12 +19,17 @@ const DamageNumber = ({ damage }: { damage: any }) => {
   const ref = React.useRef<any>(null);
   const removeDamageNumber = useStore(state => state.removeDamageNumber);
   
+  // Bigger hits punch bigger; a quick upward arc that eases out.
+  const size = 1.1 + Math.min(damage.amount, 120) / 45;
+  const big = damage.amount >= 80;
+
   useFrame((state, delta) => {
     if (ref.current) {
-      ref.current.position.y += delta * 2;
-      ref.current.material.opacity = Math.max(0, ref.current.material.opacity - delta);
-      
-      if (Date.now() - damage.createdAt > 1000) {
+      const age = (Date.now() - damage.createdAt) / 1000;
+      ref.current.position.y += delta * (age < 0.15 ? 9 : 2.5); // fast initial pop, then drift
+      ref.current.material.opacity = Math.max(0, ref.current.material.opacity - delta * 1.2);
+
+      if (age > 1) {
         removeDamageNumber(damage.id);
       }
     }
@@ -34,9 +39,9 @@ const DamageNumber = ({ damage }: { damage: any }) => {
     <Text
       ref={ref}
       position={[damage.x, damage.y + 1, damage.z]}
-      fontSize={1.5}
-      color={damage.color || '#00f5d4'}
-      outlineWidth={0.1}
+      fontSize={size}
+      color={big ? '#ffffff' : (damage.color || '#00f5d4')}
+      outlineWidth={0.12}
       outlineColor="#000000"
       font="/Geist-Bold.ttf" // Drei will load default if not found
     >

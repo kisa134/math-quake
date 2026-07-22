@@ -7,7 +7,8 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
 import { playShootSound, playJumpSound } from '../utils/audio';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
-import { sampleShake } from '../game/shake';
+import { sampleShake, addTrauma } from '../game/shake';
+import { fireHitmarker } from '../game/fx';
 
 const JUMP_FORCE = 15;
 
@@ -18,6 +19,7 @@ const _downRayDir = new THREE.Vector3(0, -1, 0);
 const _downRaycaster = new THREE.Raycaster();
 const _rayOrigin = new THREE.Vector3();
 const _shake = { x: 0, y: 0, z: 0 };
+const _recoilVec = new THREE.Vector3();
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
 
@@ -52,6 +54,11 @@ export const Player = () => {
   const lastJumpPressed = useRef(-Infinity);
   const lastGrounded = useRef(-Infinity);
   const airJumpsUsed = useRef(0);
+
+  // weapon feel
+  const muzzleRef = useRef<THREE.Mesh>(null);
+  const muzzleFade = useRef(0);
+  const recoilAmt = useRef(0);
 
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
@@ -124,6 +131,15 @@ export const Player = () => {
     camera.position.x += _shake.x;
     camera.position.y += _shake.y;
     camera.position.z += _shake.z;
+
+    // Weapon recoil as a positional camera kick (also PLC-safe): shove the eye
+    // back along the view + up, then spring back fast. Bumped in the shoot block.
+    if (recoilAmt.current > 0.0001) {
+      camera.getWorldDirection(_recoilVec);
+      camera.position.addScaledVector(_recoilVec, -recoilAmt.current * 0.5);
+      camera.position.y += recoilAmt.current * 0.2;
+      recoilAmt.current = Math.max(0, recoilAmt.current - delta * 9);
+    }
 
     if (weaponRef.current) {
       weaponRef.current.visible = !isThirdPerson;
@@ -215,6 +231,13 @@ export const Player = () => {
       }
     }
 
+    // Muzzle-flash fade
+    if (muzzleRef.current && muzzleFade.current > 0) {
+      muzzleFade.current = Math.max(0, muzzleFade.current - delta * 18);
+      (muzzleRef.current.material as THREE.MeshBasicMaterial).opacity = muzzleFade.current;
+      muzzleRef.current.visible = muzzleFade.current > 0.01;
+    }
+
     // Process laser fade
     if (laserRef.current) {
       const mat = laserRef.current.material as THREE.LineBasicMaterial;
@@ -232,7 +255,18 @@ export const Player = () => {
     if (keys.shoot && now - lastShootTime > config.rate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
-      
+
+      // --- weapon feel: recoil kick + muzzle flash + fire shake ---
+      recoilAmt.current = Math.min(1.2, recoilAmt.current + config.recoil);
+      addTrauma(0.03 + config.recoil * 0.12);
+      if (muzzleRef.current) {
+        muzzleFade.current = 1;
+        muzzleRef.current.visible = true;
+        muzzleRef.current.scale.setScalar(0.7 + Math.random() * 0.6);
+        muzzleRef.current.rotation.z = Math.random() * Math.PI;
+        (muzzleRef.current.material as THREE.MeshBasicMaterial).opacity = 1;
+      }
+
       if (weaponRef.current) {
         const weaponMesh = weaponRef.current.children[0];
         weaponMesh.position.z += config.recoil;
@@ -286,6 +320,7 @@ export const Player = () => {
                 } else {
                   useStore.getState().damageEnemy(obj.userData.id, config.damage, [hitObj.point.x, hitObj.point.y, hitObj.point.z]);
                 }
+                fireHitmarker(false);
                 isHit = true;
                 hitEnemy = true;
                 break;
@@ -376,6 +411,11 @@ export const Player = () => {
         <mesh position={[0.3, -0.3, -0.8]}>
           <boxGeometry args={[0.1, 0.1, 0.4]} />
           <meshStandardMaterial color="#888" />
+        </mesh>
+        {/* muzzle flash (toggled + faded in useFrame) */}
+        <mesh ref={muzzleRef} position={[0.3, -0.3, -1.15]} visible={false}>
+          <planeGeometry args={[0.7, 0.7]} />
+          <meshBasicMaterial color="#fff2b0" transparent opacity={0} toneMapped={false} depthWrite={false} />
         </mesh>
       </group>
       
