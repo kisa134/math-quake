@@ -27,7 +27,8 @@ const DamageNumber = ({ damage }: { damage: any }) => {
     if (ref.current) {
       const age = (Date.now() - damage.createdAt) / 1000;
       ref.current.position.y += delta * (age < 0.15 ? 9 : 2.5); // fast initial pop, then drift
-      ref.current.material.opacity = Math.max(0, ref.current.material.opacity - delta * 1.2);
+      const mat = ref.current.material;
+      if (mat) mat.opacity = Math.max(0, mat.opacity - delta * 1.2);
 
       if (age > 1) {
         removeDamageNumber(damage.id);
@@ -43,7 +44,6 @@ const DamageNumber = ({ damage }: { damage: any }) => {
       color={big ? '#ffffff' : (damage.color || '#00f5d4')}
       outlineWidth={0.12}
       outlineColor="#000000"
-      font="/Geist-Bold.ttf" // Drei will load default if not found
     >
       {damage.amount}
     </Text>

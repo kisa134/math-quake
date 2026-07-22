@@ -42,7 +42,13 @@ export const Debris = () => {
   const lastFxT = useRef(0);
 
   useEffect(() => {
-    if (meshRef.current) meshRef.current.count = 0;
+    const m = meshRef.current;
+    if (!m) return;
+    // Pre-allocate the per-instance color buffer at full capacity. Otherwise
+    // three lazily allocates it sized to the current `count` (which we set to 0),
+    // producing a 0-length buffer and broken/undersized instance colors.
+    m.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(CAP * 3), 3);
+    m.count = 0;
   }, []);
 
   useFrame((_, dtRaw) => {
