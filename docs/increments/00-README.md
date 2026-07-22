@@ -15,7 +15,7 @@ React 19 · @react-three/fiber · @react-three/drei · **@react-three/rapier** (
 |---|-------|-----|--------|
 | 1 | [01-movement.md](01-movement.md) | Распрыжка/bhop + air-strafe + сохранение импульса + вертикаль (Chained Together) + FPS/TPS | **код готов → ждёт плейтеста** |
 | 2 | [02-voxel-destruction.md](02-voxel-destruction.md) | Воксельное разрушение врагов + дебрис (InstancedMesh) + шейк + звук | **код готов → ждёт плейтеста** (арена-блоки = later) |
-| 3 | [03-world-matrix-finance.md](03-world-matrix-finance.md) | Идентичность мира: неон-биржа, тикер-потоки, матрица-дождь, постпроцесс | спека |
+| 3 | [03-world-matrix-finance.md](03-world-matrix-finance.md) | Мир: Bloom-постпроцесс + матрица-дождь + палитра/emissive + туман (MVP) | **код готов → ждёт плейтеста** (тикеры/flux/живые-свечи = later) |
 | 4 | [04-weapon-feel-juice.md](04-weapon-feel-juice.md) | Оружейный фидбек: отдача, вспышки, трейсеры, хитмаркеры, цифры урона, крауч-шейк | спека |
 
 ## Ключевые файлы кода

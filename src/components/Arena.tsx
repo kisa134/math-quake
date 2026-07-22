@@ -2,6 +2,8 @@ import React from 'react';
 import { Grid, Stars } from '@react-three/drei';
 import { RigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
+import { MatrixRain } from './MatrixRain';
+import { PALETTE } from '../theme';
 
 export const Arena = () => {
   // Generate random candlestick platforms connecting temples
@@ -33,7 +35,8 @@ export const Arena = () => {
 
   return (
     <group>
-      <Stars radius={300} depth={100} count={10000} factor={6} saturation={1} fade speed={1.5} />
+      <MatrixRain />
+      <Stars radius={300} depth={100} count={10000} factor={4} saturation={1} fade speed={1.5} />
       
       {/* Massive Void Floor - basically a kill plane visual */}
       <RigidBody type="fixed">
@@ -43,7 +46,7 @@ export const Arena = () => {
         </mesh>
       </RigidBody>
       
-      <Grid infiniteGrid fadeDistance={400} cellColor="#2a2e49" sectionColor="#4a2c73" position={[0, -49, 0]} />
+      <Grid infiniteGrid fadeDistance={400} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
 
       {/* Central High Temple */}
       <Temple position={[0, 80, 0]} size={60} color="#f72585" name="CORE_EXCHANGE" />
@@ -95,13 +98,13 @@ const Candlestick = ({ position, height, width, isGreen }: { position: [number, 
       <RigidBody type="fixed">
         <mesh receiveShadow castShadow userData={{ isFloor: true }}>
           <boxGeometry args={[width, height, width]} />
-          <meshStandardMaterial color={color} roughness={0.2} metalness={0.8} />
+          <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.6} toneMapped={false} roughness={0.25} metalness={0.7} />
         </mesh>
       </RigidBody>
       {/* The Wick (Visual only, no collision) */}
       <mesh position={[0, 0, 0]}>
         <cylinderGeometry args={[0.5, 0.5, wickHeight]} />
-        <meshBasicMaterial color={color} />
+        <meshBasicMaterial color={color} toneMapped={false} />
       </mesh>
     </group>
   );
@@ -120,7 +123,7 @@ const Platform = ({ position, args, color = "#3a0ca3" }: { position: [number, nu
   <RigidBody type="fixed">
     <mesh position={position} receiveShadow castShadow userData={{ isFloor: true }}>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} roughness={0.2} metalness={0.6} emissive={color} emissiveIntensity={0.1} />
+      <meshStandardMaterial color={color} roughness={0.25} metalness={0.6} emissive={color} emissiveIntensity={0.5} toneMapped={false} />
     </mesh>
   </RigidBody>
 );
@@ -129,7 +132,7 @@ const Pillar = ({ position, args, color = "#7209b7" }: { position: [number, numb
   <RigidBody type="fixed">
     <mesh position={position} receiveShadow castShadow userData={{ isWall: true }}>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} roughness={0.3} metalness={0.7} />
+      <meshStandardMaterial color={color} roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.35} toneMapped={false} />
     </mesh>
   </RigidBody>
 );
@@ -138,7 +141,7 @@ const JumpPad = ({ position, force = 60 }: { position: [number, number, number],
   <RigidBody type="fixed">
     <mesh position={position} receiveShadow castShadow userData={{ isJumpPad: true, jumpForce: force }}>
       <cylinderGeometry args={[4, 4, 1, 16]} />
-      <meshStandardMaterial color="#00f5d4" emissive="#00f5d4" emissiveIntensity={0.8} />
+      <meshStandardMaterial color={PALETTE.bull} emissive={PALETTE.bull} emissiveIntensity={1.0} toneMapped={false} />
     </mesh>
   </RigidBody>
 );

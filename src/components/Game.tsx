@@ -7,8 +7,10 @@ import { Projectiles } from './Projectiles';
 import { RemotePlayers } from './RemotePlayers';
 import { DamageNumbers } from './DamageNumbers';
 import { LocalMinions } from './Minions';
+import { PostFX } from './PostFX';
 import { useEffect } from 'react';
 import { useStore } from '../store';
+import { PALETTE } from '../theme';
 
 const GameManager = () => {
   const { isPlaying, spawnEnemy } = useStore();
@@ -37,16 +39,15 @@ export const Game = () => {
       gl={{ powerPreference: "high-performance", antialias: false, stencil: false, depth: true }}
       dpr={[1, 1.5]}
     >
+      <fog attach="fog" args={[PALETTE.voidDeep, 150, 650]} />
       <Physics gravity={[0, -30, 0]}>
         <GameManager />
-        <ambientLight intensity={0.2} />
-        <directionalLight 
-          castShadow 
-          position={[10, 20, 10]} 
-          intensity={1.5} 
-          shadow-mapSize={[1024, 1024]}
+        <ambientLight intensity={0.18} />
+        <directionalLight
+          position={[10, 20, 10]}
+          intensity={0.6}
         />
-        
+
         <Arena />
         <Player />
         <LocalMinions />
@@ -55,6 +56,7 @@ export const Game = () => {
         <Projectiles />
         <DamageNumbers />
       </Physics>
+      <PostFX />
     </Canvas>
   );
 };
