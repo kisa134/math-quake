@@ -20,6 +20,9 @@ const _downRaycaster = new THREE.Raycaster();
 const _rayOrigin = new THREE.Vector3();
 const _shake = { x: 0, y: 0, z: 0 };
 const _recoilVec = new THREE.Vector3();
+const _center2 = new THREE.Vector2(0, 0);
+const _grappleVec = new THREE.Vector3();
+const _ropeStart = new THREE.Vector3();
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
 
@@ -66,6 +69,12 @@ export const Player = () => {
   const lastSpaceTap = useRef(-Infinity);
   const lastStunSeen = useRef(0);
   const lastFuelWrite = useRef(0);
+
+  // grappling hook (right mouse)
+  const grappleOn = useRef(false);
+  const prevGrapple = useRef(false);
+  const grappleAnchor = useRef(new THREE.Vector3());
+  const grappleLineRef = useRef<THREE.Line>(null);
 
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
@@ -257,6 +266,59 @@ export const Player = () => {
       accelerate(_moveVel, _wishDir, hasInput ? MOVE.airAccelCap : 0, MOVE.airAccel, delta);
     }
     clampHorizontal(_moveVel);
+
+    // --- Grappling hook (right mouse): latch a surface, then reel + swing ---
+    if (keys.grapple && !prevGrapple.current) {
+      raycaster.current.setFromCamera(_center2, camera);
+      const hits = raycaster.current.intersectObjects(scene.children, true);
+      for (const h of hits) {
+        const ud = h.object.userData;
+        let o: THREE.Object3D | null = h.object;
+        let isEnemy = false;
+        while (o) { if (o.userData?.isEnemy) { isEnemy = true; break; } o = o.parent; }
+        if (ud?.isWall || ud?.isFloor || ud?.isJumpPad || isEnemy) {
+          if (h.distance <= MOVE.grappleRange) {
+            grappleAnchor.current.copy(h.point);
+            grappleOn.current = true;
+            playShootSound(150, 0.09);
+          }
+          break;
+        }
+      }
+    }
+    prevGrapple.current = keys.grapple;
+
+    if (grappleOn.current) {
+      _grappleVec.set(
+        grappleAnchor.current.x - currentPos.x,
+        grappleAnchor.current.y - (currentPos.y + 0.8),
+        grappleAnchor.current.z - currentPos.z,
+      );
+      const dist = _grappleVec.length();
+      if (!keys.grapple || dist < MOVE.grappleRelease) {
+        grappleOn.current = false; // release keeps momentum → satisfying fling
+      } else {
+        _grappleVec.multiplyScalar(1 / dist);
+        const pull = MOVE.grapplePull * delta;
+        _moveVel.x += _grappleVec.x * pull;
+        _moveVel.z += _grappleVec.z * pull;
+        newY += _grappleVec.y * pull;
+      }
+    }
+
+    // rope visual
+    if (grappleLineRef.current) {
+      if (grappleOn.current) {
+        grappleLineRef.current.visible = true;
+        const pos = grappleLineRef.current.geometry.attributes.position.array as Float32Array;
+        _ropeStart.copy(_laserStartPoint).applyMatrix4(camera.matrixWorld);
+        pos[0] = _ropeStart.x; pos[1] = _ropeStart.y; pos[2] = _ropeStart.z;
+        pos[3] = grappleAnchor.current.x; pos[4] = grappleAnchor.current.y; pos[5] = grappleAnchor.current.z;
+        grappleLineRef.current.geometry.attributes.position.needsUpdate = true;
+      } else if (grappleLineRef.current.visible) {
+        grappleLineRef.current.visible = false;
+      }
+    }
 
     playerRef.current.setLinvel({ x: _moveVel.x, y: newY, z: _moveVel.z }, true);
 
@@ -478,6 +540,11 @@ export const Player = () => {
         new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)),
         new THREE.LineBasicMaterial({ color: 0x00f5d4, linewidth: 3, transparent: true, opacity: 0.8 })
       )} ref={laserRef as any} visible={false} />
+      {/* Grappling-hook rope */}
+      <primitive object={new THREE.Line(
+        new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)),
+        new THREE.LineBasicMaterial({ color: 0xffb703, transparent: true, opacity: 0.95, toneMapped: false })
+      )} ref={grappleLineRef as any} visible={false} />
     </>
   );
 };

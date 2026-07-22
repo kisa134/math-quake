@@ -140,7 +140,7 @@ export const UI = () => {
               Math Quake
             </h1>
             <p className="text-emerald-500/80 mb-12 max-w-md text-center font-mono text-xs uppercase tracking-widest">
-              WASD to Move &bull; Space to Jump &bull; Click to Discard Geometry
+              WASD Move &bull; Space Jump &bull; 2×Space Jetpack &bull; RMB Grapple &bull; LMB Fire
             </p>
             
             {score > 0 && (

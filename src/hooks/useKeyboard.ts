@@ -9,6 +9,7 @@ export const useKeyboard = () => {
     jump: false,
     shoot: false,
     command: false,
+    grapple: false,
   });
 
   useEffect(() => {
@@ -36,22 +37,28 @@ export const useKeyboard = () => {
 
     const handleMouseDown = (e: MouseEvent) => {
       if (e.button === 0) setKeys((k) => ({ ...k, shoot: true }));
+      if (e.button === 2) setKeys((k) => ({ ...k, grapple: true }));
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (e.button === 0) setKeys((k) => ({ ...k, shoot: false }));
+      if (e.button === 2) setKeys((k) => ({ ...k, grapple: false }));
     };
+
+    const handleContextMenu = (e: MouseEvent) => e.preventDefault(); // right mouse = grapple
 
     document.addEventListener('keydown', handleKeyDown);
     document.addEventListener('keyup', handleKeyUp);
     document.addEventListener('mousedown', handleMouseDown);
     document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.removeEventListener('keyup', handleKeyUp);
       document.removeEventListener('mousedown', handleMouseDown);
       document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('contextmenu', handleContextMenu);
     };
   }, []);
 

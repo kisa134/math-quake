@@ -43,6 +43,11 @@ export const MOVE = {
   jetDrain: 45,         // fuel per second while thrusting
   jetRegen: 24,         // fuel per second when grounded (×0.3 in the air)
   doubleTapMs: 300,     // window for the second Space tap to engage the pack
+
+  // --- grappling hook (right mouse) ---
+  grapplePull: 65,      // acceleration toward the anchor while reeling
+  grappleRange: 140,    // max distance the hook can latch
+  grappleRelease: 4,    // auto-detach when this close to the anchor
 };
 
 const UP = new THREE.Vector3(0, 1, 0);
