@@ -6,17 +6,15 @@ import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
 import { playShootSound, playJumpSound } from '../utils/audio';
+import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 
-const SPEED = 30;
 const JUMP_FORCE = 15;
 
 // Shared allocations to prevent Garbage Collection stutter in useFrame
-const _frontVector = new THREE.Vector3();
-const _sideVector = new THREE.Vector3();
-const _direction = new THREE.Vector3();
-const _targetVelocity = new THREE.Vector3();
-const _currentHorizontalVel = new THREE.Vector3();
+const _wishDir = new THREE.Vector3();
+const _moveVel = new THREE.Vector3();
 const _downRayDir = new THREE.Vector3(0, -1, 0);
+const _downRaycaster = new THREE.Raycaster();
 const _rayOrigin = new THREE.Vector3();
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
@@ -46,7 +44,13 @@ export const Player = () => {
   const weaponRef = useRef<THREE.Group>(null);
   const raycaster = useRef(new THREE.Raycaster());
   const lastSyncTime = useRef(0);
-  
+
+  // bhop / jump state
+  const prevJump = useRef(false);
+  const lastJumpPressed = useRef(-Infinity);
+  const lastGrounded = useRef(-Infinity);
+  const airJumpsUsed = useRef(0);
+
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
   
@@ -116,30 +120,21 @@ export const Player = () => {
       weaponRef.current.visible = !isThirdPerson;
     }
 
-    _frontVector.set(0, 0, Number(keys.backward) - Number(keys.forward));
-    _sideVector.set(Number(keys.left) - Number(keys.right), 0, 0);
-    
-    _direction
-      .subVectors(_frontVector, _sideVector)
-      .normalize()
-      .multiplyScalar(SPEED)
-      .applyEuler(camera.rotation);
+    // ---- Movement: Quake/CS air-strafe + bhop (see src/game/movement.ts) ----
+    const yaw = cameraYaw(camera);
+    const hasInput = wishDirection(_wishDir, keys.forward, keys.backward, keys.left, keys.right, yaw);
 
-    // Apply movement with some smoothing for that Quake momentum feel
-    _targetVelocity.set(_direction.x, 0, _direction.z);
-    _currentHorizontalVel.set(velocity.x, 0, velocity.z);
-    _currentHorizontalVel.lerp(_targetVelocity, 12 * delta); // Smooth damp towards target
+    // Grounded / jump-pad probe: cast straight down from the player's feet
+    // (from the body, not the camera, so it also works in third-person).
+    _rayOrigin.set(currentPos.x, currentPos.y + 0.8, currentPos.z);
+    _downRaycaster.set(_rayOrigin, _downRayDir);
+    _downRaycaster.near = 0;
+    _downRaycaster.far = 2.2;
+    const downHits = _downRaycaster.intersectObjects(scene.children, true);
 
-    playerRef.current.setLinvel({ x: _currentHorizontalVel.x, y: velocity.y, z: _currentHorizontalVel.z }, true);
-
-    // Ground & Jump Pad check via Three.js Raycaster for precision
-    const downRay = new THREE.Raycaster(camera.position, _downRayDir, 0, 2.2);
-    const downHits = downRay.intersectObjects(scene.children, true);
-    
     let grounded = false;
     let isOnJumpPad = false;
     let customJumpForce = JUMP_FORCE * 1.8;
-    
     for (const dHit of downHits) {
       if (dHit.object.userData?.isJumpPad) {
         isOnJumpPad = true;
@@ -153,13 +148,49 @@ export const Player = () => {
       }
     }
 
+    const tNow = performance.now();
+    // jump input edges + timers: autohop while held, double-jump on re-press
+    if (keys.jump && !prevJump.current) lastJumpPressed.current = tNow;
+    prevJump.current = keys.jump;
+    if (grounded) { lastGrounded.current = tNow; airJumpsUsed.current = 0; }
+
+    const canGroundJump = tNow - lastGrounded.current <= MOVE.coyoteMs;
+    const jumpBuffered = tNow - lastJumpPressed.current <= MOVE.bufferMs;
+
+    _moveVel.set(velocity.x, 0, velocity.z);
+    let newY = velocity.y;
+    let didJump = false;
+
     if (isOnJumpPad) {
-      playerRef.current.setLinvel({ x: velocity.x, y: customJumpForce, z: velocity.z }, true);
+      newY = customJumpForce;
+      didJump = true;
       playJumpSound();
-    } else if (keys.jump && grounded) {
-      playerRef.current.setLinvel({ x: velocity.x, y: JUMP_FORCE, z: velocity.z }, true);
+    } else if (keys.jump && canGroundJump) {
+      // bhop / autohop: hold jump, keep hopping — momentum is preserved
+      newY = MOVE.jumpVelocity;
+      didJump = true;
+      lastGrounded.current = -Infinity;
+      lastJumpPressed.current = -Infinity;
+      playJumpSound();
+    } else if (jumpBuffered && !canGroundJump && airJumpsUsed.current < MOVE.airJumps) {
+      // mid-air jump → vertical chaining (Chained Together taste)
+      newY = MOVE.jumpVelocity;
+      didJump = true;
+      airJumpsUsed.current++;
+      lastJumpPressed.current = -Infinity;
       playJumpSound();
     }
+
+    if (grounded && !didJump) {
+      applyFriction(_moveVel, delta);
+      accelerate(_moveVel, _wishDir, hasInput ? MOVE.maxGroundSpeed : 0, MOVE.groundAccel, delta);
+    } else {
+      // airborne (or the frame we jumped): the air-strafe engine, momentum kept
+      accelerate(_moveVel, _wishDir, hasInput ? MOVE.airAccelCap : 0, MOVE.airAccel, delta);
+    }
+    clampHorizontal(_moveVel);
+
+    playerRef.current.setLinvel({ x: _moveVel.x, y: newY, z: _moveVel.z }, true);
 
     // Weapon sway
     const now = performance.now();

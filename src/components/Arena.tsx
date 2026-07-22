@@ -15,7 +15,7 @@ export const Arena = () => {
       const width = 4 + Math.random() * 6;
       const isGreen = Math.random() > 0.5;
       candlesticks.push(
-        <Candlestick key={`candle-${startX}-${startZ}-${i}`} position={[x, height / 2, z]} height={height} width={width} isGreen={isGreen} />
+        <Candlestick key={`candle-${startX}_${startZ}-to-${endX}_${endZ}-${i}`} position={[x, height / 2, z]} height={height} width={width} isGreen={isGreen} />
       );
     }
   };
