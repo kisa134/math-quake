@@ -1,5 +1,6 @@
 import { io } from "socket.io-client";
 import { useStore } from "./store";
+import { pushSnapshot, seedWorld } from "./net/worldBuffer";
 
 export const socket = io("/", {
   autoConnect: false,
@@ -63,5 +64,13 @@ export const initMultiplayer = (roomId: string) => {
 
   socket.on("player_left", (id) => {
     useStore.getState().removeRemotePlayer(id);
+  });
+
+  // --- Authoritative world channel (increment 05) — bypasses React/zustand ---
+  socket.on("world_init", (data) => {
+    seedWorld(data.serverTime);
+  });
+  socket.on("world_snapshot", (data) => {
+    pushSnapshot(data);
   });
 };

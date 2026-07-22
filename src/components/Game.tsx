@@ -7,6 +7,7 @@ import { Projectiles } from './Projectiles';
 import { RemotePlayers } from './RemotePlayers';
 import { DamageNumbers } from './DamageNumbers';
 import { LocalMinions } from './Minions';
+import { WorldEntities } from './WorldEntities';
 import { PostFX } from './PostFX';
 import { useEffect } from 'react';
 import { useStore } from '../store';
@@ -53,6 +54,7 @@ export const Game = () => {
         <LocalMinions />
         <RemotePlayers />
         <Enemies />
+        <WorldEntities />
         <Projectiles />
         <DamageNumbers />
       </Physics>
