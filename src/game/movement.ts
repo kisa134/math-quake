@@ -35,6 +35,14 @@ export const MOVE = {
 
   // --- safety ---
   hardSpeedCap: 95,     // absolute horizontal speed clamp so bhop can't runaway
+
+  // --- jetpack (double-tap space) ---
+  jetThrust: 55,        // upward acceleration while thrusting (units/s^2)
+  jetMaxUp: 13,         // cap on upward velocity from the jetpack
+  jetFuelMax: 100,
+  jetDrain: 45,         // fuel per second while thrusting
+  jetRegen: 24,         // fuel per second when grounded (×0.3 in the air)
+  doubleTapMs: 300,     // window for the second Space tap to engage the pack
 };
 
 const UP = new THREE.Vector3(0, 1, 0);

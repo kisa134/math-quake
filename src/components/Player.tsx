@@ -60,6 +60,13 @@ export const Player = () => {
   const muzzleFade = useRef(0);
   const recoilAmt = useRef(0);
 
+  // jetpack (double-tap space)
+  const jetOn = useRef(false);
+  const jetFuel = useRef(MOVE.jetFuelMax);
+  const lastSpaceTap = useRef(-Infinity);
+  const lastStunSeen = useRef(0);
+  const lastFuelWrite = useRef(0);
+
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
   
@@ -174,8 +181,25 @@ export const Player = () => {
     }
 
     const tNow = performance.now();
-    // jump input edges + timers: autohop while held, double-jump on re-press
-    if (keys.jump && !prevJump.current) lastJumpPressed.current = tNow;
+
+    // Jetpack knock-out: a fresh takeDamage bumps jetpackStunUntil.
+    const stunUntil = useStore.getState().jetpackStunUntil;
+    if (stunUntil > lastStunSeen.current) {
+      lastStunSeen.current = stunUntil;
+      jetFuel.current *= 0.4; // a hit dumps most of the fuel
+      jetOn.current = false;
+    }
+    const jetStunned = Date.now() < stunUntil;
+
+    // jump input edges + timers: autohop while held, double-jump on re-press,
+    // and a double-TAP of Space while airborne engages the jetpack.
+    if (keys.jump && !prevJump.current) {
+      if (tNow - lastSpaceTap.current < MOVE.doubleTapMs && !grounded && jetFuel.current > 0 && !jetStunned) {
+        jetOn.current = true;
+      }
+      lastSpaceTap.current = tNow;
+      lastJumpPressed.current = tNow;
+    }
     prevJump.current = keys.jump;
     if (grounded) { lastGrounded.current = tNow; airJumpsUsed.current = 0; }
 
@@ -204,6 +228,25 @@ export const Player = () => {
       airJumpsUsed.current++;
       lastJumpPressed.current = -Infinity;
       playJumpSound();
+    }
+
+    // --- Jetpack: hold Space (after double-tap) to thrust up while fueled ---
+    if (jetOn.current) {
+      if (!keys.jump || grounded || jetFuel.current <= 0 || jetStunned) {
+        jetOn.current = false;
+      } else {
+        newY = Math.min(velocity.y + MOVE.jetThrust * delta, MOVE.jetMaxUp);
+        jetFuel.current = Math.max(0, jetFuel.current - MOVE.jetDrain * delta);
+      }
+    }
+    if (!jetOn.current && jetFuel.current < MOVE.jetFuelMax) {
+      jetFuel.current = Math.min(MOVE.jetFuelMax, jetFuel.current + (grounded ? MOVE.jetRegen : MOVE.jetRegen * 0.3) * delta);
+    }
+    // throttled fuel → store for the HUD bar (~12Hz, no per-frame re-render)
+    if (tNow - lastFuelWrite.current > 80) {
+      lastFuelWrite.current = tNow;
+      const f = Math.round(jetFuel.current);
+      if (f !== Math.round(useStore.getState().jetpackFuel)) useStore.getState().setJetpackFuel(f);
     }
 
     if (grounded && !didJump) {

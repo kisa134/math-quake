@@ -72,6 +72,8 @@ interface GameState {
   damageNumbers: DamageNumber[];
   debris: DebrisChunk[];
   lastDeathFx: DeathFx | null;
+  jetpackFuel: number;        // 0..100 (throttled from Player for the HUD bar)
+  jetpackStunUntil: number;   // Date.now() ms until which the jetpack is knocked out
   isPlaying: boolean;
   roomId: string;
   playerId: string | null;
@@ -95,6 +97,7 @@ interface GameState {
   removeDamageNumber: (id: string) => void;
   addDebris: (chunks: Omit<DebrisChunk, 'id' | 'createdAt'>[]) => void;
   removeDebris: (id: string) => void;
+  setJetpackFuel: (v: number) => void;
   setWeapon: (index: number) => void;
   startGame: () => void;
   gameOver: () => void;
@@ -157,6 +160,8 @@ export const useStore = create<GameState>((set) => ({
   damageNumbers: [],
   debris: [],
   lastDeathFx: null,
+  jetpackFuel: 100,
+  jetpackStunUntil: 0,
   isPlaying: false,
   roomId: '',
   playerId: null,
@@ -259,11 +264,12 @@ export const useStore = create<GameState>((set) => ({
   
   takeDamage: (amount) => set((state) => {
     addTrauma(0.3); // getting hit kicks the camera
+    const jetpackStunUntil = Date.now() + 1200; // a hit knocks the jetpack out briefly
     const newHealth = Math.max(0, state.health - amount);
     if (newHealth === 0) {
-      return { health: 0, isPlaying: false };
+      return { health: 0, isPlaying: false, jetpackStunUntil };
     }
-    return { health: newHealth };
+    return { health: newHealth, jetpackStunUntil };
   }),
 
   addProjectile: (p) => set((state) => ({
@@ -299,6 +305,8 @@ export const useStore = create<GameState>((set) => ({
   removeDebris: (id) => set((state) => ({
     debris: state.debris.filter(d => d.id !== id)
   })),
+
+  setJetpackFuel: (v) => set({ jetpackFuel: v }),
 
   setWeapon: (index) => set({ currentWeapon: index }),
   

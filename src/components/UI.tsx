@@ -6,7 +6,7 @@ import type { CSSProperties } from 'react';
 import { onHitmarker } from '../game/fx';
 
 export const UI = () => {
-  const { score, health, isPlaying, startGame, roomId, setRoomId, currentWeapon } = useStore();
+  const { score, health, isPlaying, startGame, roomId, setRoomId, currentWeapon, jetpackFuel } = useStore();
   const [inputRoom, setInputRoom] = useState(roomId || 'global');
 
   const WEAPON_NAMES = ['AUTO RIFLE', 'SPREAD GUN', 'PLASMA LAUNCHER', 'RAILGUN'];
@@ -54,6 +54,17 @@ export const UI = () => {
           </div>
 
           <Hitmarker />
+
+          {/* Jetpack fuel (double-tap Space to thrust) */}
+          <div className="absolute left-1/2 -translate-x-1/2 top-[60%] w-44 pointer-events-none">
+            <div className="text-[9px] font-mono tracking-[0.3em] text-cyan-300/70 mb-1 text-center uppercase">Jet Fuel · 2×Space</div>
+            <div className="h-2 bg-cyan-950/60 border border-cyan-500/30 overflow-hidden">
+              <div
+                className="h-full"
+                style={{ width: `${jetpackFuel}%`, background: jetpackFuel < 25 ? '#ff2d2d' : '#00f5d4', transition: 'width 90ms linear' }}
+              />
+            </div>
+          </div>
 
           {/* Peripheral HUD Elements */}
           <div className="absolute top-1/2 left-8 -translate-y-1/2 flex flex-col gap-4 opacity-50">
