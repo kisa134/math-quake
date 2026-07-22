@@ -1,0 +1,360 @@
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { useFrame, useThree } from '@react-three/fiber';
+import { PointerLockControls } from '@react-three/drei';
+import * as THREE from 'three';
+import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier';
+import { useKeyboard } from '../hooks/useKeyboard';
+import { useStore } from '../store';
+import { playShootSound, playJumpSound } from '../utils/audio';
+
+const SPEED = 30;
+const JUMP_FORCE = 15;
+
+// Shared allocations to prevent Garbage Collection stutter in useFrame
+const _frontVector = new THREE.Vector3();
+const _sideVector = new THREE.Vector3();
+const _direction = new THREE.Vector3();
+const _targetVelocity = new THREE.Vector3();
+const _currentHorizontalVel = new THREE.Vector3();
+const _downRayDir = new THREE.Vector3(0, -1, 0);
+const _rayOrigin = new THREE.Vector3();
+const _endPoint = new THREE.Vector3();
+const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
+
+// Shared Geometries and Materials for sparks
+const sparkGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+const sparkMaterialEnemy = new THREE.MeshBasicMaterial({ color: 0xf72585 });
+const sparkMaterialWall = new THREE.MeshBasicMaterial({ color: 0x00f5d4 });
+
+import { socket } from '../socket';
+
+// ... other imports
+
+const WEAPON_CONFIG = [
+  { rate: 120, damage: 15, recoil: 0.1, sound: 800 },
+  { rate: 800, damage: 10, recoil: 0.4, sound: 200, spread: 0.1, rays: 8 },
+  { rate: 400, damage: 40, recoil: 0.2, sound: 400, type: 'projectile' },
+  { rate: 1500, damage: 120, recoil: 0.6, sound: 100, thick: true }
+];
+
+export const Player = () => {
+  const { camera, scene } = useThree();
+  const keys = useKeyboard();
+  const { isPlaying, gameOver, roomId, currentWeapon, setWeapon } = useStore();
+  const controlsRef = useRef<any>(null);
+  const playerRef = useRef<any>(null);
+  const weaponRef = useRef<THREE.Group>(null);
+  const raycaster = useRef(new THREE.Raycaster());
+  const lastSyncTime = useRef(0);
+  
+  const [isThirdPerson, setIsThirdPerson] = useState(false);
+  const thirdPersonRef = useRef<THREE.Group>(null);
+  
+  // Weapon switching & camera toggle
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isPlaying) return;
+      if (e.code === 'Digit1') setWeapon(0);
+      if (e.code === 'Digit2') setWeapon(1);
+      if (e.code === 'Digit3') setWeapon(2);
+      if (e.code === 'Digit4') setWeapon(3);
+      if (e.code === 'KeyV') setIsThirdPerson(prev => !prev);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isPlaying, setWeapon]);
+  
+  // Create a persistent laser mesh
+  const laserRef = useRef<THREE.Line>(null);
+  
+  const [lastShootTime, setLastShootTime] = useState(0);
+
+  const { rapier, world } = useRapier();
+
+  // Handle pointer lock logic
+  useEffect(() => {
+    const handlePointerLockChange = () => {
+      if (!document.pointerLockElement && isPlaying) {
+        gameOver();
+      }
+    };
+    
+    document.addEventListener('pointerlockchange', handlePointerLockChange);
+    return () => {
+      document.removeEventListener('pointerlockchange', handlePointerLockChange);
+    };
+  }, [isPlaying, gameOver]);
+
+  useEffect(() => {
+    if (isPlaying && controlsRef.current) {
+      controlsRef.current.lock();
+    }
+  }, [isPlaying]);
+
+  useFrame((_, delta) => {
+    if (!controlsRef.current || !controlsRef.current.isLocked || !isPlaying || !playerRef.current) return;
+
+    // Movement
+    const velocity = playerRef.current.linvel();
+    const currentPos = playerRef.current.translation();
+    
+    if (isThirdPerson) {
+      const offset = new THREE.Vector3(0, 2, 6); // Up 2, back 6
+      offset.applyQuaternion(camera.quaternion);
+      camera.position.set(currentPos.x, currentPos.y + 0.8, currentPos.z).add(offset);
+      
+      if (thirdPersonRef.current) {
+        thirdPersonRef.current.position.set(currentPos.x, currentPos.y - 1, currentPos.z);
+        const eul = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+        thirdPersonRef.current.rotation.set(0, eul.y, 0);
+      }
+    } else {
+      camera.position.set(currentPos.x, currentPos.y + 0.8, currentPos.z); // Eye level
+    }
+    
+    if (weaponRef.current) {
+      weaponRef.current.visible = !isThirdPerson;
+    }
+
+    _frontVector.set(0, 0, Number(keys.backward) - Number(keys.forward));
+    _sideVector.set(Number(keys.left) - Number(keys.right), 0, 0);
+    
+    _direction
+      .subVectors(_frontVector, _sideVector)
+      .normalize()
+      .multiplyScalar(SPEED)
+      .applyEuler(camera.rotation);
+
+    // Apply movement with some smoothing for that Quake momentum feel
+    _targetVelocity.set(_direction.x, 0, _direction.z);
+    _currentHorizontalVel.set(velocity.x, 0, velocity.z);
+    _currentHorizontalVel.lerp(_targetVelocity, 12 * delta); // Smooth damp towards target
+
+    playerRef.current.setLinvel({ x: _currentHorizontalVel.x, y: velocity.y, z: _currentHorizontalVel.z }, true);
+
+    // Ground & Jump Pad check via Three.js Raycaster for precision
+    const downRay = new THREE.Raycaster(camera.position, _downRayDir, 0, 2.2);
+    const downHits = downRay.intersectObjects(scene.children, true);
+    
+    let grounded = false;
+    let isOnJumpPad = false;
+    let customJumpForce = JUMP_FORCE * 1.8;
+    
+    for (const dHit of downHits) {
+      if (dHit.object.userData?.isJumpPad) {
+        isOnJumpPad = true;
+        grounded = true;
+        if (dHit.object.userData.jumpForce) customJumpForce = dHit.object.userData.jumpForce;
+        break;
+      }
+      if (dHit.object.userData?.isFloor || dHit.object.userData?.isWall) {
+        grounded = true;
+        break;
+      }
+    }
+
+    if (isOnJumpPad) {
+      playerRef.current.setLinvel({ x: velocity.x, y: customJumpForce, z: velocity.z }, true);
+      playJumpSound();
+    } else if (keys.jump && grounded) {
+      playerRef.current.setLinvel({ x: velocity.x, y: JUMP_FORCE, z: velocity.z }, true);
+      playJumpSound();
+    }
+
+    // Weapon sway
+    const now = performance.now();
+    if (weaponRef.current) {
+      weaponRef.current.position.copy(camera.position);
+      weaponRef.current.quaternion.copy(camera.quaternion);
+      
+      const swayAmount = 0.05;
+      const swaySpeed = 10;
+      if (keys.forward || keys.backward || keys.left || keys.right) {
+        const time = now * 0.001;
+        weaponRef.current.position.y += Math.sin(time * swaySpeed) * swayAmount;
+      }
+    }
+
+    // Process laser fade
+    if (laserRef.current) {
+      const mat = laserRef.current.material as THREE.LineBasicMaterial;
+      if (mat.opacity > 0) {
+        mat.opacity -= 5 * delta; // fade out over 0.2 seconds
+        if (mat.opacity <= 0) {
+          mat.opacity = 0;
+          laserRef.current.visible = false;
+        }
+      }
+    }
+
+    // Shooting logic
+    const config = WEAPON_CONFIG[currentWeapon];
+    if (keys.shoot && now - lastShootTime > config.rate) {
+      setLastShootTime(now);
+      playShootSound(config.sound, 0.05);
+      
+      if (weaponRef.current) {
+        const weaponMesh = weaponRef.current.children[0];
+        weaponMesh.position.z += config.recoil;
+        setTimeout(() => { if (weaponMesh) weaponMesh.position.z -= config.recoil; }, 40);
+      }
+      
+      const center = new THREE.Vector2(0, 0);
+      
+      if (config.type === 'projectile') {
+        raycaster.current.setFromCamera(center, camera);
+        const dir = raycaster.current.ray.direction;
+        const startPos = camera.position.clone().add(dir.clone().multiplyScalar(1));
+        
+        useStore.getState().addProjectile({
+          position: [startPos.x, startPos.y, startPos.z],
+          velocity: [dir.x * 50, dir.y * 50, dir.z * 50],
+          fromPlayer: true
+        });
+        
+        socket.emit("shoot", {
+          weapon: currentWeapon,
+          position: [startPos.x, startPos.y, startPos.z],
+          velocity: [dir.x * 50, dir.y * 50, dir.z * 50]
+        });
+      } else {
+        // Hitscan (Auto, Shotgun, Railgun)
+        const raysToFire = config.rays || 1;
+        
+        for (let r = 0; r < raysToFire; r++) {
+          let spreadX = 0;
+          let spreadY = 0;
+          if (config.spread) {
+            spreadX = (Math.random() - 0.5) * config.spread;
+            spreadY = (Math.random() - 0.5) * config.spread;
+          }
+          
+          raycaster.current.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
+          const intersects = raycaster.current.intersectObjects(scene.children, true);
+          raycaster.current.ray.at(100, _endPoint);
+          
+          let hitEnemy = false;
+          let targetId: string | null = null;
+          
+          for (const hitObj of intersects) {
+            let obj: THREE.Object3D | null = hitObj.object;
+            let isHit = false;
+            while (obj) {
+              if (obj.userData?.isEnemy) {
+                if (obj.userData?.isPlayer) {
+                  targetId = obj.userData.id;
+                } else {
+                  useStore.getState().damageEnemy(obj.userData.id, config.damage, [hitObj.point.x, hitObj.point.y, hitObj.point.z]);
+                }
+                isHit = true;
+                hitEnemy = true;
+                break;
+              }
+              obj = obj.parent;
+            }
+            if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
+              _endPoint.copy(hitObj.point);
+              
+              // Sparks
+              const sparkCount = hitEnemy ? 6 : 2;
+              const mat = hitEnemy ? sparkMaterialEnemy : sparkMaterialWall;
+              for(let i=0; i<sparkCount; i++) {
+                const spark = new THREE.Mesh(sparkGeometry, mat);
+                spark.position.copy(hitObj.point);
+                spark.position.x += (Math.random() - 0.5) * 0.8;
+                spark.position.y += (Math.random() - 0.5) * 0.8;
+                spark.position.z += (Math.random() - 0.5) * 0.8;
+                scene.add(spark);
+                setTimeout(() => { scene.remove(spark); }, 100 + Math.random() * 150);
+              }
+              break;
+            }
+          }
+          
+          if (targetId) {
+             socket.emit("hit", { targetId, damage: config.damage });
+             // Draw local damage number for hitting a player
+             useStore.getState().addDamageNumber([_endPoint.x, _endPoint.y, _endPoint.z], config.damage, '#4361ee');
+          }
+          
+          // Draw Laser
+          if (laserRef.current && r === 0) {
+             laserRef.current.visible = true;
+             const mat = laserRef.current.material as THREE.LineBasicMaterial;
+             mat.opacity = 0.8;
+             mat.linewidth = config.thick ? 10 : 3;
+             
+             const positions = laserRef.current.geometry.attributes.position.array as Float32Array;
+             const start = _laserStartPoint.clone().applyMatrix4(camera.matrixWorld);
+             positions[0] = start.x; positions[1] = start.y; positions[2] = start.z;
+             positions[3] = _endPoint.x; positions[4] = _endPoint.y; positions[5] = _endPoint.z;
+             laserRef.current.geometry.attributes.position.needsUpdate = true;
+          }
+        }
+      }
+    }
+    
+    // Command Target (Minions)
+    if (keys.command && now - lastSyncTime.current > 300) {
+      raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera);
+      const intersects = raycaster.current.intersectObjects(scene.children, true);
+      if (intersects.length > 0) {
+        useStore.getState().setCommandTarget([intersects[0].point.x, intersects[0].point.y, intersects[0].point.z]);
+      }
+    }
+
+    // Bounds check death (falling off)
+    if (currentPos.y < -50) {
+       gameOver();
+    }
+
+    // Sync state
+    if (roomId && now - lastSyncTime.current > 50) {
+      lastSyncTime.current = now;
+      const eul = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
+      socket.emit("update", {
+        x: currentPos.x,
+        y: currentPos.y,
+        z: currentPos.z,
+        rotation: eul.y,
+        isShooting: keys.shoot,
+        currentWeapon: currentWeapon,
+        minions: useStore.getState().localMinions
+      });
+    }
+  });
+
+  return (
+    <>
+      <PointerLockControls ref={controlsRef} />
+      {isPlaying && (
+        <RigidBody ref={playerRef} colliders={false} mass={1} type="dynamic" position={[0, 5, 0]} enabledRotations={[false, false, false]}>
+          <CapsuleCollider args={[0.5, 0.5]} />
+        </RigidBody>
+      )}
+      <group ref={weaponRef}>
+        <mesh position={[0.3, -0.3, -0.8]}>
+          <boxGeometry args={[0.1, 0.1, 0.4]} />
+          <meshStandardMaterial color="#888" />
+        </mesh>
+      </group>
+      
+      {/* 3rd Person Mesh */}
+      <group ref={thirdPersonRef} visible={false}>
+        <mesh castShadow receiveShadow>
+          <capsuleGeometry args={[0.5, 1, 4, 8]} />
+          <meshStandardMaterial color="#00f5d4" />
+        </mesh>
+        <mesh position={[0, 0.5, -0.4]} castShadow>
+          <boxGeometry args={[0.6, 0.2, 0.4]} />
+          <meshStandardMaterial color="#222" emissive="#00f5d4" emissiveIntensity={0.5} />
+        </mesh>
+      </group>
+      {/* Reusable Laser Mesh */}
+      <primitive object={new THREE.Line(
+        new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3)),
+        new THREE.LineBasicMaterial({ color: 0x00f5d4, linewidth: 3, transparent: true, opacity: 0.8 })
+      )} ref={laserRef as any} visible={false} />
+    </>
+  );
+};

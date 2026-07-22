@@ -1,0 +1,6 @@
+{
+  "name": "Math Quake",
+  "description": "A 3D web browser shooter featuring mathematical figures as enemies.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
