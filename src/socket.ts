@@ -1,76 +1,85 @@
-import { io } from "socket.io-client";
-import { useStore } from "./store";
-import { pushSnapshot, seedWorld } from "./net/worldBuffer";
+import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
+import { useStore } from './store';
+import { SUPABASE_URL, SUPABASE_ANON } from './net/supabaseConfig';
 
-export const socket = io("/", {
-  autoConnect: false,
+/**
+ * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
+ * game server). Each room is a channel `mq-<room>`; players broadcast their own
+ * transform/shots/hits and everyone else applies them. This keeps a socket.io-
+ * compatible `socket.emit/on/id` + `initMultiplayer` surface so the components
+ * (Player/UI/RemotePlayers) didn't have to change.
+ *
+ * Authority note: this is client-trust / casual (HP + score are applied on the
+ * receiving client). Good enough for friends' deathmatch. A server-authoritative
+ * host (increment 05) can layer back on top later for anti-cheat.
+ */
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
+  realtime: { params: { eventsPerSecond: 40 } },
 });
 
+const myId = Math.random().toString(36).slice(2, 10);
+
+type Handler = (payload: any) => void;
+const handlers: Record<string, Handler[]> = {};
+let channel: RealtimeChannel | null = null;
+
+export const socket = {
+  get id() { return myId; },
+  get connected() { return channel !== null; },
+  connect() { /* no-op: connection happens in initMultiplayer */ },
+  emit(event: string, data: Record<string, any> = {}) {
+    if (!channel) return;
+    channel.send({ type: 'broadcast', event, payload: { from: myId, ...data } });
+  },
+  on(event: string, cb: Handler) {
+    (handlers[event] ||= []).push(cb);
+  },
+};
+
 export const initMultiplayer = (roomId: string) => {
-  socket.connect();
-  
-  socket.on("connect", () => {
-    socket.emit("join", roomId);
+  const store = useStore.getState();
+  store.setPlayerId(myId);
+  store.setRemotePlayers({});
+
+  channel = supabase.channel(`mq-${roomId}`, {
+    config: { broadcast: { self: false }, presence: { key: myId } },
   });
 
-  socket.on("init", (data) => {
-    useStore.getState().setPlayerId(data.id);
-    
-    // Remove self from remote players
-    const remotes = { ...data.players };
-    delete remotes[data.id];
-    useStore.getState().setRemotePlayers(remotes);
+  // --- presence: authoritative room membership; prune anyone who left ---
+  channel.on('presence', { event: 'sync' }, () => {
+    if (!channel) return;
+    const present = new Set(Object.keys(channel.presenceState()));
+    present.delete(myId);
+    const remotes = useStore.getState().remotePlayers;
+    for (const id of Object.keys(remotes)) {
+      if (!present.has(id)) useStore.getState().removeRemotePlayer(id);
+    }
   });
 
-  socket.on("player_joined", (data) => {
-    useStore.getState().updateRemotePlayer(data.id, data.player);
+  // --- peer broadcasts ---
+  channel.on('broadcast', { event: 'update' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    useStore.getState().updateRemotePlayer(payload.from, payload); // creates if new
   });
 
-  socket.on("player_updated", (data) => {
-    useStore.getState().updateRemotePlayer(data.id, data.data);
-  });
-
-  socket.on("player_shot", (data) => {
+  channel.on('broadcast', { event: 'shoot' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
     useStore.getState().addProjectile({
-      position: data.position,
-      velocity: data.velocity,
-      fromPlayer: false
+      position: payload.position,
+      velocity: payload.velocity,
+      fromPlayer: false,
     });
   });
 
-  socket.on("player_hit", (data) => {
-    if (data.id === useStore.getState().playerId) {
-      useStore.getState().takeDamage(data.damage);
-    } else {
-      useStore.getState().updateRemotePlayer(data.id, { health: data.health });
+  channel.on('broadcast', { event: 'hit' }, ({ payload }) => {
+    if (!payload) return;
+    // The shooter broadcasts a hit on targetId; the target applies its own damage.
+    if (payload.targetId === myId) {
+      useStore.getState().takeDamage(payload.damage);
     }
   });
 
-  socket.on("player_died", (data) => {
-    if (data.id === useStore.getState().playerId) {
-      useStore.getState().takeDamage(100); // Trigger local death
-    } else {
-      useStore.getState().updateRemotePlayer(data.id, { health: 100 });
-    }
-  });
-
-  socket.on("score_updated", (data) => {
-    if (data.id === useStore.getState().playerId) {
-      useStore.setState({ score: data.score }); // was a direct mutation → never re-rendered
-    } else {
-      useStore.getState().updateRemotePlayer(data.id, { score: data.score });
-    }
-  });
-
-  socket.on("player_left", (id) => {
-    useStore.getState().removeRemotePlayer(id);
-  });
-
-  // --- Authoritative world channel (increment 05) — bypasses React/zustand ---
-  socket.on("world_init", (data) => {
-    seedWorld(data.serverTime);
-  });
-  socket.on("world_snapshot", (data) => {
-    pushSnapshot(data);
+  channel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') channel!.track({ id: myId });
   });
 };

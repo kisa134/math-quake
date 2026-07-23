@@ -5,6 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
+    // Served from https://<user>.github.io/math-quake/ on Pages; root locally.
+    base: process.env.GH_PAGES === 'true' ? '/math-quake/' : '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
