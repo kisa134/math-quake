@@ -23,6 +23,15 @@ const _recoilVec = new THREE.Vector3();
 const _center2 = new THREE.Vector2(0, 0);
 const _grappleVec = new THREE.Vector3();
 const _ropeStart = new THREE.Vector3();
+
+// Spawn on the CORE spire platform (y≈81), offset from its centre pad + a small
+// random jitter so two players don't stack — fixes the endless jump-pad bounce
+// you got spawning in the middle of the arena.
+const SPAWN: [number, number, number] = [
+  12 + (Math.random() - 0.5) * 12,
+  84,
+  12 + (Math.random() - 0.5) * 12,
+];
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
 
@@ -420,7 +429,13 @@ export const Player = () => {
                 if (obj.userData?.isPlayer) {
                   targetId = obj.userData.id;
                 } else {
-                  useStore.getState().damageEnemy(obj.userData.id, config.damage, [hitObj.point.x, hitObj.point.y, hitObj.point.z]);
+                  const eid = obj.userData.id;
+                  const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
+                  if (useStore.getState().isHost) {
+                    useStore.getState().damageEnemy(eid, config.damage, pt);
+                  } else {
+                    socket.emit('ehit', { id: eid, damage: config.damage, point: pt }); // host applies
+                  }
                 }
                 fireHitmarker(false);
                 isHit = true;
@@ -480,9 +495,9 @@ export const Player = () => {
       }
     }
 
-    // Fell into the void — respawn instead of ejecting to a menu (sandbox).
+    // Fell into the void — respawn to the calm spire spot (never eject).
     if (currentPos.y < -55) {
-      playerRef.current.setTranslation({ x: 0, y: 12, z: 0 }, true);
+      playerRef.current.setTranslation({ x: SPAWN[0], y: SPAWN[1], z: SPAWN[2] }, true);
       playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
     }
 
@@ -506,7 +521,7 @@ export const Player = () => {
     <>
       <PointerLockControls ref={controlsRef} />
       {isPlaying && (
-        <RigidBody ref={playerRef} colliders={false} mass={1} type="dynamic" position={[0, 5, 0]} enabledRotations={[false, false, false]}>
+        <RigidBody ref={playerRef} colliders={false} mass={1} type="dynamic" position={SPAWN} enabledRotations={[false, false, false]}>
           <CapsuleCollider args={[0.5, 0.5]} />
         </RigidBody>
       )}

@@ -84,6 +84,11 @@ interface GameState {
   editorMode: boolean;        // build/editor mode: place & delete props
   editorSelect: 'pad' | 'candle' | 'atm';
   placedProps: PlacedProp[];
+  isHost: boolean;            // this client owns/simulates the shared enemies
+  netEnemies: { id: string; type: string; x: number; y: number; z: number; hp: number }[];
+  setIsHost: (v: boolean) => void;
+  setNetEnemies: (e: { id: string; type: string; x: number; y: number; z: number; hp: number }[]) => void;
+  spawnDeathFx: (x: number, y: number, z: number, big: boolean) => void;
   isPlaying: boolean;
   roomId: string;
   playerId: string | null;
@@ -180,6 +185,8 @@ export const useStore = create<GameState>((set) => ({
   editorMode: false,
   editorSelect: 'pad',
   placedProps: [],
+  isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts
+  netEnemies: [],
   isPlaying: false,
   roomId: '',
   playerId: null,
@@ -330,6 +337,16 @@ export const useStore = create<GameState>((set) => ({
   setEditorSelect: (t) => set({ editorSelect: t }),
   addProp: (p) => set((s) => ({ placedProps: [...s.placedProps, p] })),
   removeProp: (id) => set((s) => ({ placedProps: s.placedProps.filter((p) => p.id !== id) })),
+  setIsHost: (v) => set({ isHost: v }),
+  setNetEnemies: (e) => set({ netEnemies: e }),
+  // Replay a kill's voxel burst + shake/sound locally (non-host, when a shared
+  // enemy vanishes from the host snapshot).
+  spawnDeathFx: (x, y, z, big) => set((state) => {
+    const fake: Enemy = { id: 'net', type: big ? 'candle' : 'icosahedron', position: [x, y, z], health: 0 };
+    let newDebris = state.debris.concat(makeChunks(fake, [x, y, z]));
+    if (newDebris.length > DEBRIS_CAP) newDebris = newDebris.slice(newDebris.length - DEBRIS_CAP);
+    return { debris: newDebris, lastDeathFx: { x, y, z, big, t: Date.now() } };
+  }),
 
   setWeapon: (index) => set({ currentWeapon: index }),
   

@@ -45,11 +45,15 @@ export const initMultiplayer = (roomId: string) => {
     config: { broadcast: { self: false }, presence: { key: myId } },
   });
 
-  // --- presence: authoritative room membership; prune anyone who left ---
+  // --- presence: room membership + host election (lowest id owns enemies) ---
   channel.on('presence', { event: 'sync' }, () => {
     if (!channel) return;
-    const present = new Set(Object.keys(channel.presenceState()));
-    present.delete(myId);
+    const ids = Object.keys(channel.presenceState());
+    if (!ids.includes(myId)) ids.push(myId);
+    const hostId = ids.slice().sort()[0];
+    useStore.getState().setIsHost(hostId === myId);
+
+    const present = new Set(ids);
     const remotes = useStore.getState().remotePlayers;
     for (const id of Object.keys(remotes)) {
       if (!present.has(id)) useStore.getState().removeRemotePlayer(id);
@@ -76,6 +80,19 @@ export const initMultiplayer = (roomId: string) => {
     // The shooter broadcasts a hit on targetId; the target applies its own damage.
     if (payload.targetId === myId) {
       useStore.getState().takeDamage(payload.damage);
+    }
+  });
+
+  // --- shared enemies (host-authoritative) ---
+  channel.on('broadcast', { event: 'enemies' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    useStore.getState().setNetEnemies(payload.list || []);
+  });
+  channel.on('broadcast', { event: 'ehit' }, ({ payload }) => {
+    if (!payload) return;
+    // Only the host applies damage to the shared enemies.
+    if (useStore.getState().isHost) {
+      useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
   });
 

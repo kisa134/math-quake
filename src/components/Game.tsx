@@ -3,6 +3,7 @@ import { Physics } from '@react-three/rapier';
 import { Arena } from './Arena';
 import { Player } from './Player';
 import { Enemies } from './Enemies';
+import { NetEnemies } from './NetEnemies';
 import { Projectiles } from './Projectiles';
 import { RemotePlayers } from './RemotePlayers';
 import { DamageNumbers } from './DamageNumbers';
@@ -16,20 +17,16 @@ import { useStore } from '../store';
 import { PALETTE } from '../theme';
 
 const GameManager = () => {
-  const { isPlaying, spawnEnemy } = useStore();
+  const { isPlaying, isHost, spawnEnemy } = useStore();
 
   useEffect(() => {
-    if (!isPlaying) return;
-    
-    // Initial spawn
-    for(let i=0; i<5; i++) spawnEnemy();
+    // Only the host spawns/owns the shared enemies (non-hosts mirror them).
+    if (!isPlaying || !isHost) return;
 
-    const interval = setInterval(() => {
-      spawnEnemy();
-    }, 2000);
-
+    for (let i = 0; i < 5; i++) spawnEnemy();
+    const interval = setInterval(() => spawnEnemy(), 2000);
     return () => clearInterval(interval);
-  }, [isPlaying, spawnEnemy]);
+  }, [isPlaying, isHost, spawnEnemy]);
 
   return null;
 };
@@ -56,6 +53,7 @@ export const Game = () => {
         <LocalMinions />
         <RemotePlayers />
         <Enemies />
+        <NetEnemies />
         <WorldEntities />
         <PlacedProps />
         <Editor />
