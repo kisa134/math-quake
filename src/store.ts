@@ -16,6 +16,12 @@ interface Projectile {
   velocity: [number, number, number];
   fromPlayer: boolean;
   createdAt: number;
+  // Spell substrate (WS-3). Optional so plain gun shots keep the old behavior
+  // (Projectiles.tsx falls back to damage 40 / cyan when these are absent).
+  kind?: string;      // 'bolt' | 'beam' | 'nova' | 'homing' | ...
+  color?: string;
+  damage?: number;
+  speed?: number;
 }
 
 interface DamageNumber {
@@ -38,10 +44,15 @@ interface DeathFx {
   t: number;
 }
 
+// Valheim-editor placeable (WS-1). `assetId` keys into config/assets.ts; every
+// instance carries its own transform + a static/physics flag.
 interface PlacedProp {
   id: string;
-  type: 'pad' | 'candle' | 'atm';
+  assetId: string;
   x: number; y: number; z: number;
+  rotY: number;
+  scale: number;
+  body: 'fixed' | 'dynamic';
 }
 
 interface PlayerState {
@@ -55,6 +66,7 @@ interface PlayerState {
   isShooting: boolean;
   currentWeapon: number;
   minions?: {x: number, y: number, z: number}[];
+  avatar?: string; // selected third-person figure (WS-5)
 }
 
 interface GameState {
@@ -69,8 +81,16 @@ interface GameState {
   jetpackStunUntil: number;   // Date.now() ms until which the jetpack is knocked out
   god: boolean;               // immortal + no fall-death (admin/sandbox)
   editorMode: boolean;        // build/editor mode: place & delete props
-  editorSelect: 'pad' | 'candle' | 'atm';
+  editorSelect: string;       // active asset id from config/assets.ts (WS-1)
+  editorRotY: number;         // ghost rotation (R to spin)
+  editorScale: number;        // ghost scale ([ ] to resize)
+  editorBody: 'fixed' | 'dynamic'; // G toggles static vs physics
   placedProps: PlacedProp[];
+  // Spells (WS-3): hold E → radial wheel → selected skill fires
+  selectedSpell: string;
+  spellWheelOpen: boolean;
+  // Avatar (WS-5): third-person figure chosen at start
+  avatarId: string;
   isHost: boolean;            // this client owns/simulates the shared enemies
   netEnemies: { id: string; type: string; x: number; y: number; z: number; hp: number }[];
   setIsHost: (v: boolean) => void;
@@ -101,9 +121,16 @@ interface GameState {
   removeDebris: (id: string) => void;
   setJetpackFuel: (v: number) => void;
   toggleEditor: () => void;
-  setEditorSelect: (t: 'pad' | 'candle' | 'atm') => void;
+  setEditorSelect: (t: string) => void;
+  setEditorRotY: (r: number) => void;
+  setEditorScale: (s: number) => void;
+  setEditorBody: (b: 'fixed' | 'dynamic') => void;
   addProp: (p: PlacedProp) => void;
   removeProp: (id: string) => void;
+  setPlacedProps: (props: PlacedProp[]) => void; // late-join snapshot (WS-1/net)
+  setSelectedSpell: (id: string) => void;
+  setSpellWheel: (open: boolean) => void;
+  setAvatar: (id: string) => void;
   setWeapon: (index: number) => void;
   startGame: () => void;
   gameOver: () => void;
@@ -125,7 +152,13 @@ export const useStore = create<GameState>((set) => ({
   god: true,              // immortal by default (admin sandbox)
   editorMode: false,
   editorSelect: 'pad',
+  editorRotY: 0,
+  editorScale: 1,
+  editorBody: 'fixed',
   placedProps: [],
+  selectedSpell: 'rainbow',
+  spellWheelOpen: false,
+  avatarId: 'skull',
   isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts
   netEnemies: [],
   isPlaying: false,
@@ -276,8 +309,15 @@ export const useStore = create<GameState>((set) => ({
   setJetpackFuel: (v) => set({ jetpackFuel: v }),
   toggleEditor: () => set((s) => ({ editorMode: !s.editorMode })),
   setEditorSelect: (t) => set({ editorSelect: t }),
+  setEditorRotY: (r) => set({ editorRotY: r }),
+  setEditorScale: (s) => set({ editorScale: s }),
+  setEditorBody: (b) => set({ editorBody: b }),
   addProp: (p) => set((s) => ({ placedProps: [...s.placedProps, p] })),
   removeProp: (id) => set((s) => ({ placedProps: s.placedProps.filter((p) => p.id !== id) })),
+  setPlacedProps: (props) => set({ placedProps: props }),
+  setSelectedSpell: (id) => set({ selectedSpell: id }),
+  setSpellWheel: (open) => set({ spellWheelOpen: open }),
+  setAvatar: (id) => set({ avatarId: id }),
   setIsHost: (v) => set({ isHost: v }),
   setNetEnemies: (e) => set({ netEnemies: e }),
   // Replay a kill's voxel burst + shake/sound locally (non-host, when a shared

@@ -106,7 +106,24 @@ export const initMultiplayer = (roomId: string) => {
     useStore.getState().removeProp(payload.id);
   });
 
+  // --- late-join build snapshot: a fresh peer asks, the host replies with the
+  // full placedProps so they see everything already built (fixes broadcast-only
+  // props not replaying to late joiners). ---
+  channel.on('broadcast', { event: 'props-req' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (useStore.getState().isHost) {
+      socket.emit('props-sync', { to: payload.from, props: useStore.getState().placedProps });
+    }
+  });
+  channel.on('broadcast', { event: 'props-sync' }, ({ payload }) => {
+    if (!payload || payload.to !== myId) return;
+    useStore.getState().setPlacedProps(payload.props || []);
+  });
+
   channel.subscribe((status) => {
-    if (status === 'SUBSCRIBED') channel!.track({ id: myId });
+    if (status === 'SUBSCRIBED') {
+      channel!.track({ id: myId });
+      socket.emit('props-req'); // pull existing builds from the host
+    }
   });
 };

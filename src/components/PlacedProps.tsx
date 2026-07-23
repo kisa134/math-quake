@@ -1,57 +1,57 @@
+import { Suspense } from 'react';
 import { RigidBody } from '@react-three/rapier';
 import { useStore } from '../store';
 import { PALETTE } from '../theme';
 import { tag } from '../game/hitTags';
+import { getAsset } from '../config/assets';
+import { AssetModel } from '../game/modelCache';
 
 /**
- * Renders player-built props (placed in the Editor). Each is a FUNCTIONAL fixed
- * body carrying the same userData the game reads: pads bounce (Player's ground
- * ray reads isJumpPad+jumpForce), candles/ATMs are stand-on/grapple-able
- * (isFloor/isWall). Neon + toneMapped=false so Bloom catches them.
+ * Renders player-built props (Valheim editor, WS-1). Each PlacedProp carries an
+ * assetId + its own transform (rotY, scale) + a static/physics flag. Models come
+ * from the asset registry via modelCache (GLB creatures keep textures, FBX icons
+ * are neon-shaded); built-in primitives (jump pad) draw inline. Tags ride on the
+ * meshes so the ground probe + hitscan see them.
  */
+
+// Pure visual (no rigid body / transform) — reused by the editor ghost.
+export const PropVisual = ({ assetId }: { assetId: string }) => {
+  const spec = getAsset(assetId);
+  if (spec.loader === 'primitive') {
+    if (spec.prim === 'pad') {
+      return (
+        <mesh userData={tag(spec.tags)}>
+          <cylinderGeometry args={[4, 4, 1, 20]} />
+          <meshStandardMaterial color={PALETTE.bull} emissive={PALETTE.bull} emissiveIntensity={1.1} toneMapped={false} />
+        </mesh>
+      );
+    }
+    return null;
+  }
+  return (
+    <Suspense fallback={null}>
+      <AssetModel assetId={assetId} />
+    </Suspense>
+  );
+};
+
 export const PlacedProps = () => {
   const props = useStore((s) => s.placedProps);
   return (
     <>
       {props.map((p) => (
-        <PropMesh key={p.id} type={p.type} x={p.x} y={p.y} z={p.z} />
+        <RigidBody
+          key={p.id}
+          type={p.body}
+          position={[p.x, p.y, p.z]}
+          colliders="cuboid"
+          enabledRotations={p.body === 'dynamic' ? undefined : [false, false, false]}
+        >
+          <group rotation={[0, p.rotY, 0]} scale={getAsset(p.assetId).baseScale * p.scale}>
+            <PropVisual assetId={p.assetId} />
+          </group>
+        </RigidBody>
       ))}
     </>
-  );
-};
-
-const PropMesh = ({ type, x, y, z }: { type: string; x: number; y: number; z: number }) => {
-  if (type === 'pad') {
-    return (
-      <RigidBody type="fixed" position={[x, y, z]}>
-        <mesh userData={tag({ isJumpPad: true, jumpForce: 95 })}>
-          <cylinderGeometry args={[4, 4, 1, 20]} />
-          <meshStandardMaterial color={PALETTE.bull} emissive={PALETTE.bull} emissiveIntensity={1.1} toneMapped={false} />
-        </mesh>
-      </RigidBody>
-    );
-  }
-  if (type === 'candle') {
-    return (
-      <RigidBody type="fixed" position={[x, y, z]}>
-        <mesh userData={tag({ isFloor: true })}>
-          <boxGeometry args={[5, 20, 5]} />
-          <meshStandardMaterial color={PALETTE.bear} emissive={PALETTE.bear} emissiveIntensity={0.7} toneMapped={false} roughness={0.25} metalness={0.7} />
-        </mesh>
-      </RigidBody>
-    );
-  }
-  // atm — a neon terminal box with a glowing screen
-  return (
-    <RigidBody type="fixed" position={[x, y, z]}>
-      <mesh userData={tag({ isWall: true })}>
-        <boxGeometry args={[3, 5, 2]} />
-        <meshStandardMaterial color={PALETTE.node} emissive={PALETTE.node} emissiveIntensity={0.6} toneMapped={false} metalness={0.6} roughness={0.3} />
-      </mesh>
-      <mesh position={[0, 0.7, 1.02]}>
-        <planeGeometry args={[2, 1.5]} />
-        <meshBasicMaterial color={PALETTE.dataEmerald} toneMapped={false} />
-      </mesh>
-    </RigidBody>
   );
 };

@@ -16,6 +16,8 @@ export interface HitTag {
   isJumpPad?: boolean;
   id?: string;
   jumpForce?: number;
+  friction?: number;  // per-surface friction override (WS-4 ice = low)
+  isMetal?: boolean;  // magnetic boots can stick here (WS-4)
 }
 
 /** Typed factory for `userData` (identity at runtime, checked at compile time). */

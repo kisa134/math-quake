@@ -5,13 +5,14 @@ import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
 import { onHitmarker, onFire } from '../game/fx';
 import { weaponName as weaponNameOf } from '../config/weapons';
+import { getAsset } from '../config/assets';
 
 export const UI = () => {
-  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect } = useStore();
+  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody } = useStore();
   const [locked, setLocked] = useState(false);
 
   const weaponName = weaponNameOf(currentWeapon);
-  const PROP_NAMES: Record<string, string> = { pad: 'JUMP PAD', candle: 'CANDLE', atm: 'ATM' };
+  const propName = getAsset(editorSelect).label;
 
   // Auto-enter (no menu). Room from ?room= (default 'arena'); a friend on the
   // same link + same room joins your match.
@@ -83,9 +84,9 @@ export const UI = () => {
               <div className="w-full text-center">
                 <div className="text-emerald-500 font-black text-xs tracking-[0.4em] uppercase mb-2">{editorMode ? 'Build Mode' : 'Projector Active'}</div>
                 <div className="text-2xl font-black italic uppercase tracking-widest bg-white text-black py-1 px-4 mb-2">
-                  {editorMode ? PROP_NAMES[editorSelect] : weaponName}
+                  {editorMode ? propName : weaponName}
                 </div>
-                <div className="text-xs text-emerald-400 font-mono">{editorMode ? '[1-3] PROP · LMB PLACE · RMB DELETE' : '[1-4] WEAPON · [B] BUILD'}</div>
+                <div className="text-xs text-emerald-400 font-mono">{editorMode ? 'SCROLL asset · R rotate · [ ] size · G static/phys · LMB place · RMB del' : '[1-9] WEAPON · [B] BUILD'}</div>
               </div>
             </div>
 
@@ -105,8 +106,8 @@ export const UI = () => {
       {/* Build-mode banner */}
       {isPlaying && editorMode && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 text-center pointer-events-none">
-          <div className="text-amber-300 font-black tracking-[0.3em] text-sm uppercase">🔧 Build Mode — {PROP_NAMES[editorSelect]}</div>
-          <div className="text-[10px] font-mono text-white/60 mt-1 uppercase tracking-widest">1 Pad · 2 Candle · 3 ATM &nbsp;|&nbsp; LMB place · RMB delete · B exit</div>
+          <div className="text-amber-300 font-black tracking-[0.3em] text-sm uppercase">🔧 Build — {propName} · ×{editorScale.toFixed(2)} · {editorBody === 'dynamic' ? 'PHYSICS' : 'STATIC'}</div>
+          <div className="text-[10px] font-mono text-white/60 mt-1 uppercase tracking-widest">SCROLL asset · R rotate · [ ] size · G static/phys &nbsp;|&nbsp; LMB place · RMB delete · B exit</div>
         </div>
       )}
 

@@ -11,6 +11,7 @@ import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
 import { WEAPONS } from '../config/weapons';
 import { WeaponModel } from './WeaponModel';
+import { ASSET_IDS } from '../config/assets';
 
 const JUMP_FORCE = 15;
 
@@ -91,14 +92,12 @@ export const Player = () => {
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
       if (st.editorMode) {
-        if (e.code === 'Digit1') st.setEditorSelect('pad');
-        if (e.code === 'Digit2') st.setEditorSelect('candle');
-        if (e.code === 'Digit3') st.setEditorSelect('atm');
+        // Digits jump to an asset by index; scroll cycles (Editor.tsx owns it).
+        const m = e.code.match(/^Digit([1-9])$/);
+        if (m) { const i = +m[1] - 1; if (i < ASSET_IDS.length) st.setEditorSelect(ASSET_IDS[i]); }
       } else {
-        if (e.code === 'Digit1') setWeapon(0);
-        if (e.code === 'Digit2') setWeapon(1);
-        if (e.code === 'Digit3') setWeapon(2);
-        if (e.code === 'Digit4') setWeapon(3);
+        const m = e.code.match(/^Digit([1-9])$/);
+        if (m) setWeapon(+m[1] - 1); // clamped in setWeapon usage; WS-2 adds wheel
       }
     };
     window.addEventListener('keydown', handleKeyDown);
