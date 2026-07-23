@@ -79,15 +79,23 @@ export const Player = () => {
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
   
-  // Weapon switching & camera toggle
+  // Weapon switching, camera toggle, and build-editor keys
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying) return;
-      if (e.code === 'Digit1') setWeapon(0);
-      if (e.code === 'Digit2') setWeapon(1);
-      if (e.code === 'Digit3') setWeapon(2);
-      if (e.code === 'Digit4') setWeapon(3);
-      if (e.code === 'KeyV') setIsThirdPerson(prev => !prev);
+      const st = useStore.getState();
+      if (e.code === 'KeyB') { st.toggleEditor(); return; }
+      if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
+      if (st.editorMode) {
+        if (e.code === 'Digit1') st.setEditorSelect('pad');
+        if (e.code === 'Digit2') st.setEditorSelect('candle');
+        if (e.code === 'Digit3') st.setEditorSelect('atm');
+      } else {
+        if (e.code === 'Digit1') setWeapon(0);
+        if (e.code === 'Digit2') setWeapon(1);
+        if (e.code === 'Digit3') setWeapon(2);
+        if (e.code === 'Digit4') setWeapon(3);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -100,28 +108,16 @@ export const Player = () => {
 
   const { rapier, world } = useRapier();
 
-  // Handle pointer lock logic
-  useEffect(() => {
-    const handlePointerLockChange = () => {
-      if (!document.pointerLockElement && isPlaying) {
-        gameOver();
-      }
-    };
-    
-    document.addEventListener('pointerlockchange', handlePointerLockChange);
-    return () => {
-      document.removeEventListener('pointerlockchange', handlePointerLockChange);
-    };
-  }, [isPlaying, gameOver]);
-
-  useEffect(() => {
-    if (isPlaying && controlsRef.current) {
-      controlsRef.current.lock();
-    }
-  }, [isPlaying]);
+  // NOTE: losing pointer lock (Esc / alt-tab) no longer ejects to a menu — the
+  // UI shows a "click to play" overlay instead and re-locks on click. Pointer
+  // lock is acquired via that overlay (a user gesture), not auto-locked here.
 
   useFrame((_, delta) => {
     if (!controlsRef.current || !controlsRef.current.isLocked || !isPlaying || !playerRef.current) return;
+
+    // In build/editor mode, LMB/RMB place & delete props (see Editor.tsx), so
+    // weapons and the grapple are suppressed this frame.
+    const editorMode = useStore.getState().editorMode;
 
     // Movement
     const velocity = playerRef.current.linvel();
@@ -268,7 +264,8 @@ export const Player = () => {
     clampHorizontal(_moveVel);
 
     // --- Grappling hook (right mouse): latch a surface, then reel + swing ---
-    if (keys.grapple && !prevGrapple.current) {
+    if (editorMode) grappleOn.current = false; // RMB deletes props in build mode
+    if (!editorMode && keys.grapple && !prevGrapple.current) {
       raycaster.current.setFromCamera(_center2, camera);
       const hits = raycaster.current.intersectObjects(scene.children, true);
       for (const h of hits) {
@@ -355,9 +352,9 @@ export const Player = () => {
       }
     }
 
-    // Shooting logic
+    // Shooting logic (suppressed in build/editor mode — LMB places props)
     const config = WEAPON_CONFIG[currentWeapon];
-    if (keys.shoot && now - lastShootTime > config.rate) {
+    if (!editorMode && keys.shoot && now - lastShootTime > config.rate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
 
@@ -483,9 +480,10 @@ export const Player = () => {
       }
     }
 
-    // Bounds check death (falling off)
-    if (currentPos.y < -50) {
-       gameOver();
+    // Fell into the void — respawn instead of ejecting to a menu (sandbox).
+    if (currentPos.y < -55) {
+      playerRef.current.setTranslation({ x: 0, y: 12, z: 0 }, true);
+      playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
     }
 
     // Sync state

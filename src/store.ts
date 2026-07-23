@@ -51,6 +51,12 @@ interface DeathFx {
   t: number;
 }
 
+interface PlacedProp {
+  id: string;
+  type: 'pad' | 'candle' | 'atm';
+  x: number; y: number; z: number;
+}
+
 interface PlayerState {
   id: string;
   x: number;
@@ -74,6 +80,10 @@ interface GameState {
   lastDeathFx: DeathFx | null;
   jetpackFuel: number;        // 0..100 (throttled from Player for the HUD bar)
   jetpackStunUntil: number;   // Date.now() ms until which the jetpack is knocked out
+  god: boolean;               // immortal + no fall-death (admin/sandbox)
+  editorMode: boolean;        // build/editor mode: place & delete props
+  editorSelect: 'pad' | 'candle' | 'atm';
+  placedProps: PlacedProp[];
   isPlaying: boolean;
   roomId: string;
   playerId: string | null;
@@ -98,6 +108,10 @@ interface GameState {
   addDebris: (chunks: Omit<DebrisChunk, 'id' | 'createdAt'>[]) => void;
   removeDebris: (id: string) => void;
   setJetpackFuel: (v: number) => void;
+  toggleEditor: () => void;
+  setEditorSelect: (t: 'pad' | 'candle' | 'atm') => void;
+  addProp: (p: PlacedProp) => void;
+  removeProp: (id: string) => void;
   setWeapon: (index: number) => void;
   startGame: () => void;
   gameOver: () => void;
@@ -162,6 +176,10 @@ export const useStore = create<GameState>((set) => ({
   lastDeathFx: null,
   jetpackFuel: 100,
   jetpackStunUntil: 0,
+  god: true,              // immortal by default (admin sandbox)
+  editorMode: false,
+  editorSelect: 'pad',
+  placedProps: [],
   isPlaying: false,
   roomId: '',
   playerId: null,
@@ -265,6 +283,7 @@ export const useStore = create<GameState>((set) => ({
   takeDamage: (amount) => set((state) => {
     addTrauma(0.3); // getting hit kicks the camera
     const jetpackStunUntil = Date.now() + 1200; // a hit knocks the jetpack out briefly
+    if (state.god) return { jetpackStunUntil }; // immortal: feel the hit, never lose HP
     const newHealth = Math.max(0, state.health - amount);
     if (newHealth === 0) {
       return { health: 0, isPlaying: false, jetpackStunUntil };
@@ -307,6 +326,10 @@ export const useStore = create<GameState>((set) => ({
   })),
 
   setJetpackFuel: (v) => set({ jetpackFuel: v }),
+  toggleEditor: () => set((s) => ({ editorMode: !s.editorMode })),
+  setEditorSelect: (t) => set({ editorSelect: t }),
+  addProp: (p) => set((s) => ({ placedProps: [...s.placedProps, p] })),
+  removeProp: (id) => set((s) => ({ placedProps: s.placedProps.filter((p) => p.id !== id) })),
 
   setWeapon: (index) => set({ currentWeapon: index }),
   

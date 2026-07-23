@@ -79,6 +79,16 @@ export const initMultiplayer = (roomId: string) => {
     }
   });
 
+  // --- editor: shared prop placement/removal ---
+  channel.on('broadcast', { event: 'place' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    useStore.getState().addProp(payload.prop);
+  });
+  channel.on('broadcast', { event: 'remove' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    useStore.getState().removeProp(payload.id);
+  });
+
   channel.subscribe((status) => {
     if (status === 'SUBSCRIBED') channel!.track({ id: myId });
   });
