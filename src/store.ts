@@ -156,7 +156,7 @@ export const useStore = create<GameState>((set) => ({
   editorScale: 1,
   editorBody: 'fixed',
   placedProps: [],
-  selectedSpell: 'rainbow',
+  selectedSpell: 'none', // 'none' = fire the equipped weapon's own shot; wheel picks a spell override
   spellWheelOpen: false,
   avatarId: 'skull',
   isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts

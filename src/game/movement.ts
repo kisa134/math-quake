@@ -82,12 +82,16 @@ export function wishDirection(
   return has;
 }
 
-/** Source-style ground friction applied in-place to a horizontal velocity. */
-export function applyFriction(vel: THREE.Vector3, dt: number) {
+/**
+ * Source-style ground friction applied in-place to a horizontal velocity.
+ * `friction` defaults to MOVE.friction; per-surface overrides (WS-4: ice = ~1)
+ * let slippery decks bleed speed far more slowly than normal ground.
+ */
+export function applyFriction(vel: THREE.Vector3, dt: number, friction = MOVE.friction) {
   const speed = Math.hypot(vel.x, vel.z);
   if (speed < 1e-3) { vel.x = 0; vel.z = 0; return; }
   const control = speed < MOVE.stopSpeed ? MOVE.stopSpeed : speed;
-  const drop = control * MOVE.friction * dt;
+  const drop = control * friction * dt;
   const scale = Math.max(speed - drop, 0) / speed;
   vel.x *= scale;
   vel.z *= scale;

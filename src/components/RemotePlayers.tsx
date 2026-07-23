@@ -4,6 +4,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 
 import { RemotePlayerMinions } from './Minions';
+import { CharacterModel } from './CharacterModel';
 
 export const RemotePlayers = () => {
   const remotePlayers = useStore(state => state.remotePlayers);
@@ -47,19 +48,18 @@ const RemotePlayer = ({ player }: { player: any }) => {
     }
   });
 
+  // The hit tag lives on the GROUP: hitscan/projectiles walk parents up from the
+  // hit mesh (see Player.tsx / Projectiles.tsx), so the avatar's own meshes stay
+  // tag-free while the whole figure remains shootable. Keep isEnemy/isPlayer/id.
   return (
-    <group ref={groupRef} position={[player.x, player.y, player.z]}>
-      <mesh userData={{ isEnemy: true, isPlayer: true, id: player.id }} castShadow receiveShadow>
-        <capsuleGeometry args={[0.5, 1, 4, 8]} />
-        <meshStandardMaterial color={player.health > 50 ? "#4361ee" : "#f72585"} />
-      </mesh>
-      
-      {/* Visor/Eye direction */}
-      <mesh position={[0, 0.5, -0.4]} castShadow>
-        <boxGeometry args={[0.6, 0.2, 0.4]} />
-        <meshStandardMaterial color="#222" emissive="#00f5d4" emissiveIntensity={0.5} />
-      </mesh>
-      
+    <group
+      ref={groupRef}
+      position={[player.x, player.y, player.z]}
+      userData={{ isEnemy: true, isPlayer: true, id: player.id }}
+    >
+      {/* Their chosen figure (falls back to a Meshy creature). */}
+      <CharacterModel avatar={player.avatar ?? 'skull'} />
+
       {/* Muzzle flash light */}
       <pointLight ref={flashRef} position={[0, 0, -1]} distance={10} color="#00f5d4" intensity={0} />
     </group>

@@ -42,19 +42,34 @@ export const WeaponModel = ({ weapon }: { weapon: number }) => {
 
   const ref = useRef<THREE.Group>(null);
   const punch = useRef(0);
+  const clock = useRef(0);
 
-  useEffect(() => onFire((recoil) => { punch.current = Math.min(1.2, punch.current + recoil); }), []);
+  useEffect(() => onFire((recoil) => { punch.current = Math.min(1.4, punch.current + recoil); }), []);
 
   useFrame((_, delta) => {
+    clock.current += delta;
     const t = weaponTune[weapon];
     const g = ref.current;
     if (t && g) {
       const p = punch.current;
-      g.position.set(t.pos[0], t.pos[1] + p * 0.04, t.pos[2] + p * 0.12); // kick toward camera
-      g.rotation.set(t.rot[0] - p * 0.25, t.rot[1], t.rot[2]);
+      // Juicy recoil: snap back toward camera + up, twist (roll) and yaw a touch,
+      // plus a subtle idle breathing bob so the viewmodel feels alive at rest.
+      const bobY = Math.sin(clock.current * 1.6) * 0.006;
+      const bobX = Math.cos(clock.current * 1.1) * 0.004;
+      g.position.set(
+        t.pos[0] + bobX + p * 0.02,
+        t.pos[1] + bobY + p * 0.05,
+        t.pos[2] + p * 0.16, // kick toward camera
+      );
+      g.rotation.set(
+        t.rot[0] - p * 0.32,        // muzzle rises
+        t.rot[1] + p * 0.10,        // slight yaw flick
+        t.rot[2] + p * 0.18,        // roll twist
+      );
       g.scale.setScalar(t.scale);
     }
-    punch.current = Math.max(0, punch.current - delta * 7);
+    // Snappy attack already applied on the fire event; fast spring-back out.
+    punch.current = Math.max(0, punch.current - delta * 8);
   });
 
   return <primitive ref={ref} object={model} />;

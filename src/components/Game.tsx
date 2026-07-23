@@ -1,6 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
 import { Arena } from './Arena';
+import { Levels } from './Levels';
 import { Player } from './Player';
 import { Enemies } from './Enemies';
 import { NetEnemies } from './NetEnemies';
@@ -49,6 +50,7 @@ export const Game = () => {
         />
 
         <Arena />
+        <Levels />
         <Player />
         <LocalMinions />
         <RemotePlayers />

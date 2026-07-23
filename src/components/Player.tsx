@@ -12,6 +12,8 @@ import { fireHitmarker, fireShot } from '../game/fx';
 import { WEAPONS } from '../config/weapons';
 import { WeaponModel } from './WeaponModel';
 import { ASSET_IDS } from '../config/assets';
+import { getSpell } from '../config/spells';
+import { CharacterModel } from './CharacterModel';
 
 const JUMP_FORCE = 15;
 
@@ -26,6 +28,17 @@ const _recoilVec = new THREE.Vector3();
 const _center2 = new THREE.Vector2(0, 0);
 const _grappleVec = new THREE.Vector3();
 const _ropeStart = new THREE.Vector3();
+
+// WS-4 magnetic-boots probe (short lateral + up rays; reused each frame)
+const _bootRaycaster = new THREE.Raycaster();
+const _bootNormal = new THREE.Vector3();
+const BOOT_DIRS = [
+  new THREE.Vector3(1, 0, 0),
+  new THREE.Vector3(-1, 0, 0),
+  new THREE.Vector3(0, 0, 1),
+  new THREE.Vector3(0, 0, -1),
+  new THREE.Vector3(0, 1, 0), // metal ceilings → hang underneath
+];
 
 // Spawn on the CORE spire platform (y≈81), offset from its centre pad + a small
 // random jitter so two players don't stack — fixes the endless jump-pad bounce
@@ -50,7 +63,7 @@ import { socket } from '../socket';
 export const Player = () => {
   const { camera, scene } = useThree();
   const keys = useKeyboard();
-  const { isPlaying, gameOver, roomId, currentWeapon, setWeapon } = useStore();
+  const { isPlaying, gameOver, roomId, currentWeapon, setWeapon, avatarId } = useStore();
   const controlsRef = useRef<any>(null);
   const playerRef = useRef<any>(null);
   const weaponRef = useRef<THREE.Group>(null);
@@ -62,6 +75,7 @@ export const Player = () => {
   const lastJumpPressed = useRef(-Infinity);
   const lastGrounded = useRef(-Infinity);
   const airJumpsUsed = useRef(0);
+  const bootsOn = useRef(false); // WS-4 magnetic boots (toggle KeyC)
 
   // weapon feel
   const muzzleRef = useRef<THREE.Mesh>(null);
@@ -84,24 +98,47 @@ export const Player = () => {
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
   
-  // Weapon switching, camera toggle, and build-editor keys
+  // Input: spell wheel (hold E), boots (C), build (B), 3rd-person (V), weapon
+  // digits/wheel. Merged across WS-2 (wheel), WS-3 (E spell wheel), WS-4 (C boots).
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
+      if (e.code === 'KeyE') { if (!e.repeat) st.setSpellWheel(true); return; } // hold E → spell wheel
+      if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
       if (st.editorMode) {
         // Digits jump to an asset by index; scroll cycles (Editor.tsx owns it).
         const m = e.code.match(/^Digit([1-9])$/);
         if (m) { const i = +m[1] - 1; if (i < ASSET_IDS.length) st.setEditorSelect(ASSET_IDS[i]); }
-      } else {
+      } else if (!st.spellWheelOpen) {
+        // While the spell wheel is open, digits pick spell slices (SpellWheel owns that).
         const m = e.code.match(/^Digit([1-9])$/);
-        if (m) setWeapon(+m[1] - 1); // clamped in setWeapon usage; WS-2 adds wheel
+        if (m) setWeapon(+m[1] - 1); // 1-9 reaches the first nine; wheel covers the rest
       }
     };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'KeyE') useStore.getState().setSpellWheel(false); // release → commit + close
+    };
+    // Mouse-wheel cycles the whole arsenal (reaches weapons 10-20). Editor owns
+    // the wheel in build mode; the spell wheel owns it while open.
+    const handleWheel = (e: WheelEvent) => {
+      if (!isPlaying) return;
+      const st = useStore.getState();
+      if (st.editorMode || st.spellWheelOpen) return;
+      const n = WEAPONS.length;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      st.setWeapon((st.currentWeapon + dir + n) % n);
+    };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('wheel', handleWheel, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('wheel', handleWheel);
+    };
   }, [isPlaying, setWeapon]);
   
   // Create a persistent laser mesh
@@ -175,17 +212,45 @@ export const Player = () => {
     let grounded = false;
     let isOnJumpPad = false;
     let customJumpForce = JUMP_FORCE * 1.8;
+    let groundFriction = MOVE.friction; // WS-4: per-surface friction (ice = low)
+    let groundIsMetal = false;          // WS-4: down-probe hit a magnetic surface
     for (const dHit of downHits) {
-      if (dHit.object.userData?.isJumpPad) {
+      const ud = dHit.object.userData;
+      if (ud?.isJumpPad) {
         isOnJumpPad = true;
         grounded = true;
-        if (dHit.object.userData.jumpForce) customJumpForce = dHit.object.userData.jumpForce;
+        if (ud.jumpForce) customJumpForce = ud.jumpForce;
         break;
       }
-      if (dHit.object.userData?.isFloor || dHit.object.userData?.isWall) {
+      if (ud?.isFloor || ud?.isWall) {
         grounded = true;
+        groundFriction = ud.friction ?? MOVE.friction;
+        groundIsMetal = !!ud.isMetal;
         break;
       }
+    }
+
+    // --- WS-4 Magnetic boots: cling to a nearby metal surface (walk walls / hang) ---
+    let magnetHold = false;
+    _bootNormal.set(0, 0, 0); // accumulates the outward surface normal (toward player)
+    if (bootsOn.current) {
+      if (groundIsMetal) { magnetHold = true; _bootNormal.set(0, 1, 0); }
+      for (let d = 0; d < BOOT_DIRS.length; d++) {
+        _rayOrigin.set(currentPos.x, currentPos.y, currentPos.z);
+        _bootRaycaster.set(_rayOrigin, BOOT_DIRS[d]);
+        _bootRaycaster.near = 0;
+        _bootRaycaster.far = 1.6;
+        const bHits = _bootRaycaster.intersectObjects(scene.children, true);
+        for (const bh of bHits) {
+          const ud = bh.object.userData;
+          if (ud?.isMetal && (ud.isWall || ud.isFloor)) {
+            magnetHold = true;
+            _bootNormal.sub(BOOT_DIRS[d]); // normal points from surface toward player
+            break;
+          }
+        }
+      }
+      if (magnetHold) grounded = true; // clinging counts as grounded (walk + jump off)
     }
 
     const tNow = performance.now();
@@ -257,8 +322,21 @@ export const Player = () => {
       if (f !== Math.round(useStore.getState().jetpackFuel)) useStore.getState().setJetpackFuel(f);
     }
 
+    // Magnetic cling: cancel the fall + draw toward the metal surface so you can
+    // walk metal walls / hang under metal decks. Skip the frame you jump off.
+    if (magnetHold && !didJump) {
+      newY = newY > 0 ? newY : newY * 0.15; // kill downward velocity, keep hops
+      const nlen = Math.hypot(_bootNormal.x, _bootNormal.y, _bootNormal.z);
+      if (nlen > 1e-3) {
+        const pull = 8 * delta; // move along -normal = toward the surface
+        _moveVel.x -= (_bootNormal.x / nlen) * pull;
+        newY       -= (_bootNormal.y / nlen) * pull;
+        _moveVel.z -= (_bootNormal.z / nlen) * pull;
+      }
+    }
+
     if (grounded && !didJump) {
-      applyFriction(_moveVel, delta);
+      applyFriction(_moveVel, delta, groundFriction); // WS-4: ice decks stay slippery
       accelerate(_moveVel, _wishDir, hasInput ? MOVE.maxGroundSpeed : 0, MOVE.groundAccel, delta);
     } else {
       // airborne (or the frame we jumped): the air-strafe engine, momentum kept
@@ -355,9 +433,13 @@ export const Player = () => {
       }
     }
 
-    // Shooting logic (suppressed in build/editor mode — LMB places props)
+    // Shooting logic (suppressed in build/editor mode — LMB places props).
+    // Selected spell ('none' = fire the weapon's own shot) can override; the
+    // fire rate is the slower of the weapon rate and the spell cooldown.
     const config = WEAPONS[currentWeapon];
-    if (!editorMode && keys.shoot && now - lastShootTime > config.rate) {
+    const spell = getSpell(useStore.getState().selectedSpell);
+    const fireGate = Math.max(config.rate, spell.cooldown ?? 0);
+    if (!editorMode && keys.shoot && !useStore.getState().spellWheelOpen && now - lastShootTime > fireGate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
       fireShot(config.recoil); // crosshair bloom + viewmodel punch
@@ -378,8 +460,74 @@ export const Player = () => {
       // (viewmodel recoil punch is handled in WeaponModel via the fire event)
 
       const center = new THREE.Vector2(0, 0);
-      
-      if (config.type === 'projectile') {
+
+      if (spell.kind !== 'none') {
+        // ===== SPELL CAST (WS-3): the selected spell overrides the weapon shot.
+        // Weapon still governs recoil/muzzle/sound above. "матрица без правил". =====
+        raycaster.current.setFromCamera(center, camera);
+        const sdir = raycaster.current.ray.direction.clone();
+        const muzzlePos = camera.position.clone().add(sdir.clone().multiplyScalar(1));
+
+        if (spell.kind === 'beam') {
+          const intersects = raycaster.current.intersectObjects(scene.children, true);
+          raycaster.current.ray.at(120, _endPoint);
+          let anyHit = false, anyKill = false;
+          for (const hitObj of intersects) {
+            let obj: THREE.Object3D | null = hitObj.object; let isHit = false;
+            while (obj) {
+              if (obj.userData?.isEnemy) {
+                const eid = obj.userData.id;
+                const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
+                if (obj.userData?.isPlayer) socket.emit('hit', { targetId: eid, damage: spell.damage });
+                else if (useStore.getState().isHost) {
+                  useStore.getState().damageEnemy(eid, spell.damage, pt);
+                  if (!useStore.getState().enemies.some((en) => en.id === eid)) anyKill = true;
+                } else socket.emit('ehit', { id: eid, damage: spell.damage, point: pt });
+                anyHit = true; isHit = true; break;
+              }
+              obj = obj.parent;
+            }
+            if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
+              _endPoint.copy(hitObj.point); break;
+            }
+          }
+          if (laserRef.current) {
+            laserRef.current.visible = true;
+            const mat = laserRef.current.material as THREE.LineBasicMaterial;
+            mat.color.set(spell.color); mat.opacity = 0.9; mat.linewidth = 6;
+            const positions = laserRef.current.geometry.attributes.position.array as Float32Array;
+            const start = _laserStartPoint.clone().applyMatrix4(camera.matrixWorld);
+            positions[0] = start.x; positions[1] = start.y; positions[2] = start.z;
+            positions[3] = _endPoint.x; positions[4] = _endPoint.y; positions[5] = _endPoint.z;
+            laserRef.current.geometry.attributes.position.needsUpdate = true;
+          }
+          if (anyHit) { fireHitmarker(anyKill); if (anyKill) playExplosionSound(); else playHitTick(); }
+        } else if (spell.kind === 'nova') {
+          const count = spell.novaCount ?? 12;
+          const half = (spell.novaSpread ?? Math.PI) * 0.5;
+          const up = Math.abs(sdir.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+          const right = new THREE.Vector3().crossVectors(sdir, up).normalize();
+          const rup = new THREE.Vector3().crossVectors(right, sdir).normalize();
+          for (let i = 0; i < count; i++) {
+            const a = (i / count) * Math.PI * 2;
+            const off = right.clone().multiplyScalar(Math.cos(a)).add(rup.clone().multiplyScalar(Math.sin(a)));
+            const d = sdir.clone().multiplyScalar(Math.cos(half)).add(off.multiplyScalar(Math.sin(half))).normalize();
+            useStore.getState().addProjectile({
+              position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
+              velocity: [d.x * spell.speed, d.y * spell.speed, d.z * spell.speed],
+              fromPlayer: true, kind: 'bolt', color: spell.color, damage: spell.damage, speed: spell.speed,
+            });
+          }
+          socket.emit('shoot', { weapon: currentWeapon, position: [muzzlePos.x, muzzlePos.y, muzzlePos.z], velocity: [sdir.x * spell.speed, sdir.y * spell.speed, sdir.z * spell.speed] });
+        } else {
+          useStore.getState().addProjectile({
+            position: [muzzlePos.x, muzzlePos.y, muzzlePos.z],
+            velocity: [sdir.x * spell.speed, sdir.y * spell.speed, sdir.z * spell.speed],
+            fromPlayer: true, kind: spell.kind, color: spell.color, damage: spell.damage, speed: spell.speed,
+          });
+          socket.emit('shoot', { weapon: currentWeapon, position: [muzzlePos.x, muzzlePos.y, muzzlePos.z], velocity: [sdir.x * spell.speed, sdir.y * spell.speed, sdir.z * spell.speed] });
+        }
+      } else if (config.type === 'projectile') {
         raycaster.current.setFromCamera(center, camera);
         const dir = raycaster.current.ray.direction;
         const startPos = camera.position.clone().add(dir.clone().multiplyScalar(1));
@@ -521,7 +669,8 @@ export const Player = () => {
         rotation: eul.y,
         isShooting: keys.shoot,
         currentWeapon: currentWeapon,
-        minions: useStore.getState().localMinions
+        minions: useStore.getState().localMinions,
+        avatar: useStore.getState().avatarId
       });
     }
   });
@@ -547,16 +696,11 @@ export const Player = () => {
         </mesh>
       </group>
       
-      {/* 3rd Person Mesh */}
-      <group ref={thirdPersonRef} visible={false}>
-        <mesh castShadow receiveShadow>
-          <capsuleGeometry args={[0.5, 1, 4, 8]} />
-          <meshStandardMaterial color="#00f5d4" />
-        </mesh>
-        <mesh position={[0, 0.5, -0.4]} castShadow>
-          <boxGeometry args={[0.6, 0.2, 0.4]} />
-          <meshStandardMaterial color="#222" emissive="#00f5d4" emissiveIntensity={0.5} />
-        </mesh>
+      {/* 3rd-person avatar — your chosen figure (WS-5), visible only in 3rd person */}
+      <group ref={thirdPersonRef} visible={isThirdPerson}>
+        <Suspense fallback={null}>
+          <CharacterModel avatar={avatarId} />
+        </Suspense>
       </group>
       {/* Reusable Laser Mesh */}
       <primitive object={new THREE.Line(

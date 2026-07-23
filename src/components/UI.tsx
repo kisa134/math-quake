@@ -6,6 +6,9 @@ import type { CSSProperties } from 'react';
 import { onHitmarker, onFire } from '../game/fx';
 import { weaponName as weaponNameOf } from '../config/weapons';
 import { getAsset } from '../config/assets';
+import { WeaponHUD } from './WeaponHUD';
+import { SpellWheel } from './SpellWheel';
+import { AvatarPicker } from './AvatarPicker';
 
 export const UI = () => {
   const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody } = useStore();
@@ -59,6 +62,9 @@ export const UI = () => {
           <DynamicCrosshair />
 
           <Hitmarker />
+          <SpellWheel />
+
+          {!editorMode && <WeaponHUD />}
 
           {/* Jetpack fuel */}
           <div className="absolute left-1/2 -translate-x-1/2 top-[60%] w-44 pointer-events-none">
@@ -120,10 +126,13 @@ export const UI = () => {
           <div className="text-emerald-400 font-black text-xs tracking-[0.4em] uppercase mb-3">Math Quake</div>
           <div className="text-white font-black text-4xl uppercase tracking-widest mb-4">Click to play</div>
           <div className="text-emerald-500/70 font-mono text-[11px] uppercase tracking-widest text-center max-w-md">
-            WASD · Mouse · LMB fire · Space jump · 2×Space jetpack · RMB grapple · B build
+            WASD · Mouse · LMB fire · Space jump · 2×Space jetpack · RMB grapple · B build · E magic · C boots · V 3rd-person
           </div>
         </div>
       )}
+
+      {/* Pick your third-person figure (WS-5) — manages its own visibility */}
+      <AvatarPicker />
     </div>
   );
 };
