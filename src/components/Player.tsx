@@ -5,10 +5,11 @@ import * as THREE from 'three';
 import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
-import { playShootSound, playJumpSound } from '../utils/audio';
+import { playShootSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
-import { fireHitmarker } from '../game/fx';
+import { fireHitmarker, fireShot } from '../game/fx';
+import { WEAPONS } from '../config/weapons';
 
 const JUMP_FORCE = 15;
 
@@ -42,14 +43,7 @@ const sparkMaterialWall = new THREE.MeshBasicMaterial({ color: 0x00f5d4 });
 
 import { socket } from '../socket';
 
-// ... other imports
-
-const WEAPON_CONFIG = [
-  { rate: 120, damage: 15, recoil: 0.1, sound: 800 },
-  { rate: 800, damage: 10, recoil: 0.4, sound: 200, spread: 0.1, rays: 8 },
-  { rate: 400, damage: 40, recoil: 0.2, sound: 400, type: 'projectile' },
-  { rate: 1500, damage: 120, recoil: 0.6, sound: 100, thick: true }
-];
+// Weapon tuning + feel colors live in src/config/weapons.ts (single source).
 
 export const Player = () => {
   const { camera, scene } = useThree();
@@ -362,10 +356,11 @@ export const Player = () => {
     }
 
     // Shooting logic (suppressed in build/editor mode — LMB places props)
-    const config = WEAPON_CONFIG[currentWeapon];
+    const config = WEAPONS[currentWeapon];
     if (!editorMode && keys.shoot && now - lastShootTime > config.rate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
+      fireShot(); // crosshair bloom
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
       recoilAmt.current = Math.min(1.2, recoilAmt.current + config.recoil);
@@ -375,7 +370,9 @@ export const Player = () => {
         muzzleRef.current.visible = true;
         muzzleRef.current.scale.setScalar(0.7 + Math.random() * 0.6);
         muzzleRef.current.rotation.z = Math.random() * Math.PI;
-        (muzzleRef.current.material as THREE.MeshBasicMaterial).opacity = 1;
+        const mm = muzzleRef.current.material as THREE.MeshBasicMaterial;
+        mm.color.set(config.muzzle); // per-weapon flash color
+        mm.opacity = 1;
       }
 
       if (weaponRef.current) {
@@ -405,7 +402,11 @@ export const Player = () => {
       } else {
         // Hitscan (Auto, Shotgun, Railgun)
         const raysToFire = config.rays || 1;
-        
+        // Tally the whole trigger pull, then fire ONE kill-aware marker + sound
+        // (a shotgun's 8 pellets shouldn't stack 8 hitmarkers/ticks).
+        let anyEnemyHit = false;
+        let anyKill = false;
+
         for (let r = 0; r < raysToFire; r++) {
           let spreadX = 0;
           let spreadY = 0;
@@ -413,14 +414,14 @@ export const Player = () => {
             spreadX = (Math.random() - 0.5) * config.spread;
             spreadY = (Math.random() - 0.5) * config.spread;
           }
-          
+
           raycaster.current.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
           const intersects = raycaster.current.intersectObjects(scene.children, true);
           raycaster.current.ray.at(100, _endPoint);
-          
+
           let hitEnemy = false;
           let targetId: string | null = null;
-          
+
           for (const hitObj of intersects) {
             let obj: THREE.Object3D | null = hitObj.object;
             let isHit = false;
@@ -433,11 +434,13 @@ export const Player = () => {
                   const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
                   if (useStore.getState().isHost) {
                     useStore.getState().damageEnemy(eid, config.damage, pt);
+                    // Gone from the authoritative list ⇒ this shot killed it.
+                    if (!useStore.getState().enemies.some((e) => e.id === eid)) anyKill = true;
                   } else {
                     socket.emit('ehit', { id: eid, damage: config.damage, point: pt }); // host applies
                   }
                 }
-                fireHitmarker(false);
+                anyEnemyHit = true;
                 isHit = true;
                 hitEnemy = true;
                 break;
@@ -446,7 +449,7 @@ export const Player = () => {
             }
             if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
               _endPoint.copy(hitObj.point);
-              
+
               // Sparks
               const sparkCount = hitEnemy ? 6 : 2;
               const mat = hitEnemy ? sparkMaterialEnemy : sparkMaterialWall;
@@ -462,26 +465,36 @@ export const Player = () => {
               break;
             }
           }
-          
+
           if (targetId) {
              socket.emit("hit", { targetId, damage: config.damage });
              // Draw local damage number for hitting a player
              useStore.getState().addDamageNumber([_endPoint.x, _endPoint.y, _endPoint.z], config.damage, '#4361ee');
+             anyEnemyHit = true;
           }
-          
-          // Draw Laser
+
+          // Draw Laser (per-weapon color; railgun draws fat)
           if (laserRef.current && r === 0) {
              laserRef.current.visible = true;
              const mat = laserRef.current.material as THREE.LineBasicMaterial;
+             mat.color.set(config.tracer);
              mat.opacity = 0.8;
              mat.linewidth = config.thick ? 10 : 3;
-             
+
              const positions = laserRef.current.geometry.attributes.position.array as Float32Array;
              const start = _laserStartPoint.clone().applyMatrix4(camera.matrixWorld);
              positions[0] = start.x; positions[1] = start.y; positions[2] = start.z;
              positions[3] = _endPoint.x; positions[4] = _endPoint.y; positions[5] = _endPoint.z;
              laserRef.current.geometry.attributes.position.needsUpdate = true;
           }
+        }
+
+        // One feedback pulse for the whole shot: gold kill-marker + boom on a
+        // kill, else a white hitmarker + crisp tick.
+        if (anyEnemyHit) {
+          fireHitmarker(anyKill);
+          if (anyKill) playExplosionSound();
+          else playHitTick();
         }
       }
     }

@@ -1,4 +1,5 @@
 let audioCtx: AudioContext | null = null;
+let ambientOn = false;
 
 export const initAudio = () => {
   if (!audioCtx) {
@@ -7,6 +8,59 @@ export const initAudio = () => {
   if (audioCtx.state === 'suspended') {
     audioCtx.resume();
   }
+  startAmbient();
+};
+
+// Low, evolving matrix drone under everything — atmosphere, not melody. Two
+// detuned oscillators through a slow-swept lowpass at a whisper-quiet gain.
+// Started once on the first user gesture (initAudio) and left running.
+const startAmbient = () => {
+  if (!audioCtx || ambientOn) return;
+  ambientOn = true;
+  const t = audioCtx.currentTime;
+
+  const bus = audioCtx.createGain();
+  bus.gain.value = 0.05;
+  const filter = audioCtx.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = 320;
+  filter.Q.value = 4;
+  bus.connect(filter);
+  filter.connect(audioCtx.destination);
+
+  for (const [freq, type] of [[55, 'sine'], [82.5, 'triangle']] as const) {
+    const osc = audioCtx.createOscillator();
+    osc.type = type;
+    osc.frequency.value = freq;
+    osc.connect(bus);
+    osc.start(t);
+  }
+
+  // Slow LFO breathes the filter cutoff so the drone shifts over ~14s.
+  const lfo = audioCtx.createOscillator();
+  const lfoGain = audioCtx.createGain();
+  lfo.frequency.value = 0.07;
+  lfoGain.gain.value = 180;
+  lfo.connect(lfoGain);
+  lfoGain.connect(filter.frequency);
+  lfo.start(t);
+};
+
+// Crisp high blip for a landed hit — the audible half of the hitmarker.
+export const playHitTick = () => {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'square';
+  osc.frequency.setValueAtTime(1250, t);
+  osc.frequency.exponentialRampToValueAtTime(820, t + 0.05);
+  gain.gain.setValueAtTime(0.09, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.06);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(t);
+  osc.stop(t + 0.06);
 };
 
 export const playShootSound = (freq = 400, dur = 0.1) => {

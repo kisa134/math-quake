@@ -1,16 +1,16 @@
 import { useStore } from '../store';
 import { initAudio } from '../utils/audio';
 import { initMultiplayer } from '../socket';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { onHitmarker } from '../game/fx';
+import { onHitmarker, onFire } from '../game/fx';
+import { weaponName as weaponNameOf } from '../config/weapons';
 
 export const UI = () => {
   const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect } = useStore();
   const [locked, setLocked] = useState(false);
 
-  const WEAPON_NAMES = ['AUTO RIFLE', 'SPREAD GUN', 'PLASMA LAUNCHER', 'RAILGUN'];
-  const weaponName = WEAPON_NAMES[currentWeapon] || 'UNKNOWN';
+  const weaponName = weaponNameOf(currentWeapon);
   const PROP_NAMES: Record<string, string> = { pad: 'JUMP PAD', candle: 'CANDLE', atm: 'ATM' };
 
   // Auto-enter (no menu). Room from ?room= (default 'arena'); a friend on the
@@ -55,15 +55,7 @@ export const UI = () => {
             </div>
           </div>
 
-          {/* Crosshair */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="relative w-24 h-24">
-              <div className="absolute inset-0 border border-emerald-500/40 rounded-full scale-110"></div>
-              <div className="absolute top-1/2 left-0 w-full h-[1px] bg-emerald-500"></div>
-              <div className="absolute left-1/2 top-0 h-full w-[1px] bg-emerald-500"></div>
-              <div className="absolute inset-4 border-2 border-emerald-500 rotate-45"></div>
-            </div>
-          </div>
+          <DynamicCrosshair />
 
           <Hitmarker />
 
@@ -135,38 +127,87 @@ export const UI = () => {
   );
 };
 
-// Center hitmarker — a quick white X that pops on every landed shot.
-const Hitmarker = () => {
-  const [id, setId] = useState(0);
-  useEffect(() => onHitmarker(() => setId((x) => x + 1)), []);
-  if (!id) return null;
-  return <HitmarkerFlash key={id} />;
+// Dynamic crosshair — four ticks that bloom outward on every shot, then ease
+// back. Runs its own rAF and mutates the DOM imperatively (no React re-render
+// per shot, so the 120ms auto-rifle stays cheap). Emerald, combat-readable.
+const DynamicCrosshair = () => {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const bloom = useRef(0);
+
+  useEffect(() => onFire(() => { bloom.current = Math.min(1, bloom.current + 0.55); }), []);
+
+  useEffect(() => {
+    let raf = 0;
+    const tick = () => {
+      bloom.current = Math.max(0, bloom.current - 0.055);
+      const el = rootRef.current;
+      if (el) {
+        const gap = 5 + bloom.current * 15; // px each tick is pushed from center
+        el.style.setProperty('--g', `${gap}px`);
+        el.style.opacity = String(0.75 + bloom.current * 0.25);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  const c = '#10b981';
+  const glow = '0 0 4px rgba(16,185,129,0.9)';
+  const tick = (rot: number): CSSProperties => ({
+    position: 'absolute', left: '50%', top: '50%', width: 2, height: 9,
+    marginLeft: -1, background: c, borderRadius: 2, boxShadow: glow,
+    transform: `rotate(${rot}deg) translateY(calc(-1 * (var(--g,5px) + 4px)))`,
+    transformOrigin: 'center top',
+  });
+  return (
+    <div ref={rootRef} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <div className="relative" style={{ width: 0, height: 0 }}>
+        <div style={{ position: 'absolute', left: -1.5, top: -1.5, width: 3, height: 3, borderRadius: '50%', background: c, boxShadow: glow }} />
+        <div style={tick(0)} />
+        <div style={tick(90)} />
+        <div style={tick(180)} />
+        <div style={tick(270)} />
+      </div>
+    </div>
+  );
 };
 
-const HitmarkerFlash = () => {
+// Center hitmarker — a quick X that pops on every landed shot: white on a hit,
+// bigger + gold on a kill (fireHitmarker(true)).
+const Hitmarker = () => {
+  const [state, setState] = useState<{ id: number; kill: boolean }>({ id: 0, kill: false });
+  useEffect(() => onHitmarker((kill) => setState((s) => ({ id: s.id + 1, kill }))), []);
+  if (!state.id) return null;
+  return <HitmarkerFlash key={state.id} kill={state.kill} />;
+};
+
+const HitmarkerFlash = ({ kill }: { kill: boolean }) => {
   const [on, setOn] = useState(false);
   useEffect(() => {
     const r = requestAnimationFrame(() => setOn(true));
     return () => cancelAnimationFrame(r);
   }, []);
+  const color = kill ? '#ffd700' : '#ffffff';
+  const len = kill ? 26 : 18;
   const bar: CSSProperties = {
     position: 'absolute',
     left: '50%',
     top: '50%',
-    width: 18,
-    height: 3,
-    marginLeft: -9,
+    width: len,
+    height: kill ? 4 : 3,
+    marginLeft: -len / 2,
     marginTop: -1.5,
-    background: '#ffffff',
+    background: color,
     borderRadius: 2,
-    boxShadow: '0 0 6px rgba(255,255,255,0.9)',
-    transition: 'opacity 200ms ease-out, transform 200ms ease-out',
+    boxShadow: `0 0 ${kill ? 10 : 6}px ${kill ? 'rgba(255,215,0,0.95)' : 'rgba(255,255,255,0.9)'}`,
+    transition: 'opacity 220ms ease-out, transform 220ms ease-out',
     opacity: on ? 0 : 1,
   };
   return (
     <div className="absolute inset-0 pointer-events-none">
-      <div style={{ ...bar, transform: `rotate(45deg) scale(${on ? 0.9 : 1.5})` }} />
-      <div style={{ ...bar, transform: `rotate(-45deg) scale(${on ? 0.9 : 1.5})` }} />
+      <div style={{ ...bar, transform: `rotate(45deg) scale(${on ? 0.9 : kill ? 1.8 : 1.5})` }} />
+      <div style={{ ...bar, transform: `rotate(-45deg) scale(${on ? 0.9 : kill ? 1.8 : 1.5})` }} />
     </div>
   );
 };
