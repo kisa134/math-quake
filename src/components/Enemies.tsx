@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import { Debris } from './Debris';
 import { socket } from '../socket';
 import { enemyLive } from '../game/enemyNet';
+import { tag } from '../game/hitTags';
 
 const _enemyPos = new THREE.Vector3();
 const _enemyDir = new THREE.Vector3();
@@ -71,7 +72,7 @@ const EnemyMesh = ({ id, position, type }: { id: string, position: [number, numb
 
   return (
     <RigidBody ref={rbRef} position={position} type="dynamic" linearDamping={2} angularDamping={1} mass={1}>
-      <mesh castShadow receiveShadow userData={{ isEnemy: true, id }}>
+      <mesh castShadow receiveShadow userData={tag({ isEnemy: true, id })}>
         {geometry}
         <primitive object={material} attach="material" />
       </mesh>

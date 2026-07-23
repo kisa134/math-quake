@@ -1,6 +1,7 @@
 import { RigidBody } from '@react-three/rapier';
 import { useStore } from '../store';
 import { PALETTE } from '../theme';
+import { tag } from '../game/hitTags';
 
 /**
  * Renders player-built props (placed in the Editor). Each is a FUNCTIONAL fixed
@@ -23,7 +24,7 @@ const PropMesh = ({ type, x, y, z }: { type: string; x: number; y: number; z: nu
   if (type === 'pad') {
     return (
       <RigidBody type="fixed" position={[x, y, z]}>
-        <mesh userData={{ isJumpPad: true, jumpForce: 95 }}>
+        <mesh userData={tag({ isJumpPad: true, jumpForce: 95 })}>
           <cylinderGeometry args={[4, 4, 1, 20]} />
           <meshStandardMaterial color={PALETTE.bull} emissive={PALETTE.bull} emissiveIntensity={1.1} toneMapped={false} />
         </mesh>
@@ -33,7 +34,7 @@ const PropMesh = ({ type, x, y, z }: { type: string; x: number; y: number; z: nu
   if (type === 'candle') {
     return (
       <RigidBody type="fixed" position={[x, y, z]}>
-        <mesh userData={{ isFloor: true }}>
+        <mesh userData={tag({ isFloor: true })}>
           <boxGeometry args={[5, 20, 5]} />
           <meshStandardMaterial color={PALETTE.bear} emissive={PALETTE.bear} emissiveIntensity={0.7} toneMapped={false} roughness={0.25} metalness={0.7} />
         </mesh>
@@ -43,7 +44,7 @@ const PropMesh = ({ type, x, y, z }: { type: string; x: number; y: number; z: nu
   // atm — a neon terminal box with a glowing screen
   return (
     <RigidBody type="fixed" position={[x, y, z]}>
-      <mesh userData={{ isWall: true }}>
+      <mesh userData={tag({ isWall: true })}>
         <boxGeometry args={[3, 5, 2]} />
         <meshStandardMaterial color={PALETTE.node} emissive={PALETTE.node} emissiveIntensity={0.6} toneMapped={false} metalness={0.6} roughness={0.3} />
       </mesh>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactElement } from 'react';
 import { useStore } from '../store';
+import { tag } from '../game/hitTags';
 
 /**
  * Non-host renderer for the shared, host-authoritative enemies. Draws them from
@@ -43,7 +44,7 @@ export const NetEnemies = () => {
   return (
     <>
       {netEnemies.map((e) => (
-        <mesh key={e.id} position={[e.x, e.y, e.z]} userData={{ isEnemy: true, id: e.id }}>
+        <mesh key={e.id} position={[e.x, e.y, e.z]} userData={tag({ isEnemy: true, id: e.id })}>
           {geoFor(e.type)}
           <meshStandardMaterial
             color={e.type === 'candle' ? '#ffb703' : '#f72585'}
