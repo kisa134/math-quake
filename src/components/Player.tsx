@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, Suspense } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { PointerLockControls } from '@react-three/drei';
 import * as THREE from 'three';
@@ -10,6 +10,7 @@ import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizon
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
 import { WEAPONS } from '../config/weapons';
+import { WeaponModel } from './WeaponModel';
 
 const JUMP_FORCE = 15;
 
@@ -360,7 +361,7 @@ export const Player = () => {
     if (!editorMode && keys.shoot && now - lastShootTime > config.rate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
-      fireShot(); // crosshair bloom
+      fireShot(config.recoil); // crosshair bloom + viewmodel punch
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
       recoilAmt.current = Math.min(1.2, recoilAmt.current + config.recoil);
@@ -375,12 +376,8 @@ export const Player = () => {
         mm.opacity = 1;
       }
 
-      if (weaponRef.current) {
-        const weaponMesh = weaponRef.current.children[0];
-        weaponMesh.position.z += config.recoil;
-        setTimeout(() => { if (weaponMesh) weaponMesh.position.z -= config.recoil; }, 40);
-      }
-      
+      // (viewmodel recoil punch is handled in WeaponModel via the fire event)
+
       const center = new THREE.Vector2(0, 0);
       
       if (config.type === 'projectile') {
@@ -539,10 +536,11 @@ export const Player = () => {
         </RigidBody>
       )}
       <group ref={weaponRef}>
-        <mesh position={[0.3, -0.3, -0.8]}>
-          <boxGeometry args={[0.1, 0.1, 0.4]} />
-          <meshStandardMaterial color="#888" />
-        </mesh>
+        {/* Synty 3D viewmodel per weapon (re-shaded neon). Suspense fallback is
+            null so a still-loading FBX just shows no gun for a frame. */}
+        <Suspense fallback={null}>
+          <WeaponModel weapon={currentWeapon} />
+        </Suspense>
         {/* muzzle flash (toggled + faded in useFrame) */}
         <mesh ref={muzzleRef} position={[0.3, -0.3, -1.15]} visible={false}>
           <planeGeometry args={[0.7, 0.7]} />

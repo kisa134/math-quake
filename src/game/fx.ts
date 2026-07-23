@@ -4,7 +4,7 @@
  * churn zustand on every shot. Cosmetic only.
  */
 type HitListener = (kill: boolean) => void;
-type FireListener = () => void;
+type FireListener = (recoil: number) => void;
 
 const hitListeners = new Set<HitListener>();
 const fireListeners = new Set<FireListener>();
@@ -24,6 +24,6 @@ export function onFire(l: FireListener): () => void {
   return () => fireListeners.delete(l);
 }
 
-export function fireShot() {
-  fireListeners.forEach((l) => l());
+export function fireShot(recoil = 0) {
+  fireListeners.forEach((l) => l(recoil));
 }
