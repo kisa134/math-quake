@@ -66,6 +66,76 @@ export const setAmbientMood = (epoch: number) => {
   ambientLfo.frequency.linearRampToValueAtTime(MOOD_LFO[epoch] ?? 0.07, t + 2);
 };
 
+// ── V6.1 CAR AUDIO: engine loop + drift screech (created once, gain-driven) ──
+let engOsc: OscillatorNode | null = null;
+let engSub: OscillatorNode | null = null;
+let engGain: GainNode | null = null;
+let screechGain: GainNode | null = null;
+
+const ensureEngine = () => {
+  if (!audioCtx || engOsc) return;
+  const t = audioCtx.currentTime;
+  engGain = audioCtx.createGain();
+  engGain.gain.value = 0;
+  engGain.connect(audioCtx.destination);
+  // rumbling sawtooth + sub square — the V8 growl
+  engOsc = audioCtx.createOscillator();
+  engOsc.type = 'sawtooth';
+  engOsc.frequency.value = 55;
+  const lp = audioCtx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 700;
+  engOsc.connect(lp);
+  lp.connect(engGain);
+  engOsc.start(t);
+  engSub = audioCtx.createOscillator();
+  engSub.type = 'square';
+  engSub.frequency.value = 27;
+  const sg = audioCtx.createGain();
+  sg.gain.value = 0.4;
+  engSub.connect(sg);
+  sg.connect(engGain);
+  engSub.start(t);
+  // drift screech: looped noise through a screaming bandpass
+  const len = Math.floor(audioCtx.sampleRate * 1);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.loop = true;
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 1250;
+  bp.Q.value = 6;
+  screechGain = audioCtx.createGain();
+  screechGain.gain.value = 0;
+  src.connect(bp);
+  bp.connect(screechGain);
+  screechGain.connect(audioCtx.destination);
+  src.start(t);
+};
+
+/** Per-frame from Cars.tsx: speed01 = |speed|/max, drifting = визг. */
+export const updateEngine = (speed01: number, drifting: boolean) => {
+  if (!audioCtx) return;
+  ensureEngine();
+  if (!engOsc || !engSub || !engGain || !screechGain) return;
+  const t = audioCtx.currentTime;
+  const rpm = 50 + speed01 * 210 + (drifting ? 20 : 0);
+  engOsc.frequency.setTargetAtTime(rpm, t, 0.08);
+  engSub.frequency.setTargetAtTime(rpm * 0.5, t, 0.1);
+  engGain.gain.setTargetAtTime(0.035 + speed01 * 0.05, t, 0.1);
+  screechGain.gain.setTargetAtTime(drifting ? 0.05 + speed01 * 0.05 : 0, t, 0.06);
+};
+
+export const stopEngine = () => {
+  if (!audioCtx || !engGain || !screechGain) return;
+  const t = audioCtx.currentTime;
+  engGain.gain.setTargetAtTime(0, t, 0.15);
+  screechGain.gain.setTargetAtTime(0, t, 0.08);
+};
+
 // Crisp high blip for a landed hit — the audible half of the hitmarker.
 export const playHitTick = () => {
   if (!audioCtx) return;
