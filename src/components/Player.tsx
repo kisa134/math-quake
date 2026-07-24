@@ -22,6 +22,7 @@ import { ECON } from '../config/economy';
 import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
 import { carveVoxCandle, getVoxCandlePos, voxCandleAlive } from './VoxelCandles';
+import { botHitInbox } from '../game/botHorde';
 
 const JUMP_FORCE = 15;
 
@@ -640,6 +641,14 @@ export const Player = () => {
           for (const hitObj of intersects) {
             let obj: THREE.Object3D | null = hitObj.object; let isHit = false;
             while (obj) {
+              if (obj.userData?.isBot) {
+                const bid = +obj.userData.id;
+                if (useStore.getState().isHost) botHitInbox.push({ id: bid, damage: spell.damage });
+                else socket.emit('bhit', { id: bid, damage: spell.damage });
+                useStore.getState().addDebris(makeGore(hitObj.point.x, hitObj.point.y, hitObj.point.z, 8));
+                useStore.getState().addMoney(spell.damage * ECON.moneyPerDamage);
+                anyHit = true; isHit = true; break;
+              }
               if (obj.userData?.isCreature) {
                 damageCreature(obj.userData.id, spell.damage);
                 useStore.getState().addMoney(spell.damage * ECON.moneyPerDamage);
@@ -752,6 +761,14 @@ export const Player = () => {
             let obj: THREE.Object3D | null = hitObj.object;
             let isHit = false;
             while (obj) {
+              if (obj.userData?.isBot) {
+                const bid = +obj.userData.id;
+                if (useStore.getState().isHost) botHitInbox.push({ id: bid, damage: config.damage });
+                else socket.emit('bhit', { id: bid, damage: config.damage });
+                useStore.getState().addDebris(makeGore(hitObj.point.x, hitObj.point.y, hitObj.point.z, 6 + Math.round(config.damage * 0.08)));
+                useStore.getState().addMoney(config.damage * ECON.moneyPerDamage);
+                anyEnemyHit = true; isHit = true; hitEnemy = true; break;
+              }
               if (obj.userData?.isCreature) {
                 damageCreature(obj.userData.id, config.damage);
                 useStore.getState().addMoney(config.damage * ECON.moneyPerDamage);

@@ -5,6 +5,7 @@ import { creatureHitInbox } from './game/creatureNet';
 import { voxInbox } from './game/voxCandles';
 import { roundWinReward } from './config/economy';
 import { goreInbox } from './game/voxHumanoid';
+import { botHitInbox, botFxInbox, netBots } from './game/botHorde';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -100,6 +101,20 @@ export const initMultiplayer = (roomId: string) => {
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
+  });
+
+  // --- V4 bot horde: host-authoritative, peers mirror + relay hits ---
+  channel.on('broadcast', { event: 'bots' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (!useStore.getState().isHost) netBots.list = payload.list || [];
+  });
+  channel.on('broadcast', { event: 'bhit' }, ({ payload }) => {
+    if (!payload) return;
+    if (useStore.getState().isHost) botHitInbox.push({ id: payload.id, damage: payload.damage });
+  });
+  channel.on('broadcast', { event: 'botdead' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    botFxInbox.push({ x: payload.x, y: payload.y, z: payload.z, big: !!payload.big });
   });
 
   // --- CS match rounds (V2.2): host drives, peers mirror + self-pay bonuses ---

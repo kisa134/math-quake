@@ -24,6 +24,8 @@ import { useStore } from '../store';
 import { PALETTE } from '../theme';
 import { socket } from '../socket';
 import { MATCH, wavesSize, roundWinReward } from '../config/economy';
+import { BotHorde } from './BotHorde';
+import { spawnBotWave, aliveBotCount } from './BotHorde';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -56,6 +58,11 @@ const GameManager = () => {
           const nr = { num: r.num, phase: 'wave' as const, until: 0 };
           st.setRound(nr);
           socket.emit('round', nr);
+          // V4: the wave is mostly voxel-dude BOTS (70%) + shape anomalies (30%)
+          const total = wavesSize(r.num);
+          const botCount = Math.round(total * 0.7);
+          spawnBotWave(botCount, r.num);
+          spawnLeft.current = total - botCount;
         }
       } else {
         if (spawnLeft.current > 0 && now - lastSpawn.current > MATCH.spawnGapMs) {
@@ -63,7 +70,7 @@ const GameManager = () => {
           st.spawnEnemy();
           spawnLeft.current--;
         }
-        if (spawnLeft.current === 0 && st.enemies.length === 0) {
+        if (spawnLeft.current === 0 && st.enemies.length === 0 && aliveBotCount() === 0) {
           st.addMoney(roundWinReward(r.num));
           socket.emit('roundwin', { num: r.num });
           startBuy(r.num + 1);
@@ -105,6 +112,7 @@ export const Game = () => {
         <RemotePlayers />
         <Enemies />
         <NetEnemies />
+        <BotHorde />
         <Creatures />
         <WorldEntities />
         <Train />

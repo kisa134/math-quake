@@ -12,6 +12,7 @@ export interface HitTag {
   isEnemy?: boolean;
   isCreature?: boolean; // neutral critter (WS-E): damageable via damageCreature, tameable via T
   isVoxCandle?: boolean; // Teardown-style voxel candle proxy (V2.1): shots carve voxels
+  isBot?: boolean; // horde voxel-dude bot proxy (V4): damage via botHitInbox/'bhit'
   isPlayer?: boolean;
   isFloor?: boolean;
   isWall?: boolean;

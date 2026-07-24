@@ -10,6 +10,7 @@ import type { DebrisChunk } from '../game/voxel';
 import { carveVoxCandle } from './VoxelCandles';
 import { ECON } from '../config/economy';
 import { makeGore } from '../game/voxHumanoid';
+import { botHitInbox } from '../game/botHorde';
 
 /**
  * Projectile behaviors — V2: сложносочинённая magic (multi-stage, layered).
@@ -256,6 +257,15 @@ const Projectile = ({ id, position, velocity, fromPlayer, createdAt, kind, color
           let obj: THREE.Object3D | null = hit.object;
           let hitEnemy = false;
           while (obj) {
+            if (obj.userData?.isBot) {
+              const bid = +obj.userData.id;
+              if (useStore.getState().isHost) botHitInbox.push({ id: bid, damage: dmg });
+              else socket.emit('bhit', { id: bid, damage: dmg });
+              useStore.getState().addDebris(makeGore(hit.point.x, hit.point.y, hit.point.z, 8));
+              useStore.getState().addMoney(dmg * ECON.moneyPerDamage);
+              hitEnemy = true;
+              break;
+            }
             if (obj.userData?.isEnemy) {
               if (obj.userData?.isPlayer) {
                 socket.emit('hit', { targetId: obj.userData.id, damage: dmg });
