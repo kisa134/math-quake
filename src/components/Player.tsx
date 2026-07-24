@@ -13,7 +13,8 @@ import { WEAPONS } from '../config/weapons';
 import { WeaponModel } from './WeaponModel';
 import { BUILD_IDS } from '../config/assets';
 import { getSpell } from '../config/spells';
-import { CharacterModel } from './CharacterModel';
+import { VoxDude } from './VoxDude';
+import { makeGore } from '../game/voxHumanoid';
 import { trainVelocity } from './Train';
 import { carPositions, tryToggleCar } from './Cars';
 import { grappleCityHits } from './Cityscape';
@@ -83,7 +84,7 @@ import { socket } from '../socket';
 export const Player = () => {
   const { camera, scene } = useThree();
   const keys = useKeyboard();
-  const { isPlaying, gameOver, roomId, currentWeapon, setWeapon, avatarId } = useStore();
+  const { isPlaying, gameOver, roomId, currentWeapon, setWeapon } = useStore();
   const controlsRef = useRef<any>(null);
   const playerRef = useRef<any>(null);
   const weaponRef = useRef<THREE.Group>(null);
@@ -647,7 +648,10 @@ export const Player = () => {
               if (obj.userData?.isEnemy) {
                 const eid = obj.userData.id;
                 const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
-                if (obj.userData?.isPlayer) socket.emit('hit', { targetId: eid, damage: spell.damage });
+                if (obj.userData?.isPlayer) {
+                  socket.emit('hit', { targetId: eid, damage: spell.damage });
+                  useStore.getState().addDebris(makeGore(hitObj.point.x, hitObj.point.y, hitObj.point.z, 8));
+                }
                 else if (useStore.getState().isHost) {
                   useStore.getState().damageEnemy(eid, spell.damage, pt);
                   if (!useStore.getState().enemies.some((en) => en.id === eid)) anyKill = true;
@@ -808,6 +812,9 @@ export const Player = () => {
              socket.emit("hit", { targetId, damage: config.damage });
              // Draw local damage number for hitting a player
              useStore.getState().addDamageNumber([_endPoint.x, _endPoint.y, _endPoint.z], config.damage, '#4361ee');
+             // instant voxel GORE at the impact for the shooter (broadcast
+             // self:false — everyone else gets it via the 'hit' goreInbox)
+             useStore.getState().addDebris(makeGore(_endPoint.x, _endPoint.y, _endPoint.z, 8 + Math.round(config.damage * 0.1)));
              anyEnemyHit = true;
           }
 
@@ -890,11 +897,14 @@ export const Player = () => {
         </mesh>
       </group>
       
-      {/* 3rd-person avatar — your chosen figure (WS-5), visible only in 3rd person */}
+      {/* 3rd-person body — the white blocky voxel dude (V3.2), 3rd person only */}
       <group ref={thirdPersonRef} visible={isThirdPerson}>
-        <Suspense fallback={null}>
-          <CharacterModel avatar={avatarId} />
-        </Suspense>
+        <VoxDude
+          getSpeed={() => {
+            const v = playerRef.current?.linvel();
+            return v ? Math.hypot(v.x, v.z) : 0;
+          }}
+        />
       </group>
       {/* Reusable Laser Mesh */}
       <primitive object={new THREE.Line(

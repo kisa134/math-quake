@@ -8,7 +8,6 @@ import { weaponName as weaponNameOf } from '../config/weapons';
 import { getAsset } from '../config/assets';
 import { WeaponHUD } from './WeaponHUD';
 import { SpellWheel } from './SpellWheel';
-import { AvatarPicker } from './AvatarPicker';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -133,8 +132,7 @@ export const UI = () => {
         </div>
       )}
 
-      {/* Pick your third-person figure (WS-5) — manages its own visibility */}
-      <AvatarPicker />
+      {/* V3.2: all player bodies are the white voxel dude — picker retired */}
     </div>
   );
 };

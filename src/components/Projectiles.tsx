@@ -9,6 +9,7 @@ import { makeFlames } from '../game/voxel';
 import type { DebrisChunk } from '../game/voxel';
 import { carveVoxCandle } from './VoxelCandles';
 import { ECON } from '../config/economy';
+import { makeGore } from '../game/voxHumanoid';
 
 /**
  * Projectile behaviors — V2: сложносочинённая magic (multi-stage, layered).
@@ -258,6 +259,7 @@ const Projectile = ({ id, position, velocity, fromPlayer, createdAt, kind, color
             if (obj.userData?.isEnemy) {
               if (obj.userData?.isPlayer) {
                 socket.emit('hit', { targetId: obj.userData.id, damage: dmg });
+                useStore.getState().addDebris(makeGore(hit.point.x, hit.point.y, hit.point.z, 8));
               } else {
                 const eid = obj.userData.id;
                 const pt: [number, number, number] = [hit.point.x, hit.point.y, hit.point.z];

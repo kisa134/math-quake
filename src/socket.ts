@@ -4,6 +4,7 @@ import { SUPABASE_URL, SUPABASE_ANON } from './net/supabaseConfig';
 import { creatureHitInbox } from './game/creatureNet';
 import { voxInbox } from './game/voxCandles';
 import { roundWinReward } from './config/economy';
+import { goreInbox } from './game/voxHumanoid';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -84,6 +85,8 @@ export const initMultiplayer = (roomId: string) => {
     if (payload.targetId === myId) {
       useStore.getState().takeDamage(payload.damage);
     }
+    // Everyone sees the GORE on the victim's voxel dude (V3.2).
+    goreInbox.push({ targetId: payload.targetId, damage: payload.damage });
   });
 
   // --- shared enemies (host-authoritative) ---
