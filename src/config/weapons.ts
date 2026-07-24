@@ -37,6 +37,7 @@ export interface WeaponSpec {
   // V4 CS gunfeel:
   spray?: [number, number][]; // fixed CS-style spray pattern (NDC offsets, climbs up); index resets after 260ms
   voxel?: 'smg' | 'shotgun' | 'ak' | 'rail' | 'minigun' | 'deagle'; // V6: procedural voxel gun instead of FBX
+  portal?: boolean; // V6 Ш4: LMB places portals A/B instead of shooting
   heat?: boolean; // minigun: spread+rate scale with a spin-up heat 0..1
   slow?: number;  // movement speed multiplier while firing (minigun stomp)
 }
@@ -97,6 +98,13 @@ export const WEAPONS: WeaponSpec[] = [
     model: 'weapons/dagger_01.fbx', vLen: 0.42, mScale: 1, voxel: 'deagle',
     mPos: [0.27, -0.32, -0.46], mRot: [0.3, 0.12, 0.08],
     spray: [[0, 0], [0.004, 0.02], [-0.006, 0.034], [0.008, 0.042]] },
+
+  // 9 — PORTAL RIG: как в Portal. ЛКМ ставит порталы поочерёдно (синий A /
+  // оранжевый B) на пол и стены; вход в один — вылет из другого с импульсом.
+  { name: 'PORTAL RIG', rate: 350, damage: 0, recoil: 0.12, sound: 620,
+    tracer: 0x00b4d8, muzzle: '#9ee8ff', anim: 'thrust', portal: true,
+    model: 'weapons/wand_01.fbx', vLen: 0.55, mScale: 1, voxel: 'deagle',
+    mPos: [0.27, -0.32, -0.46], mRot: [0.2, 0.1, 0] },
 ];
 
 export const weaponName = (i: number): string => WEAPONS[i]?.name ?? 'UNKNOWN';

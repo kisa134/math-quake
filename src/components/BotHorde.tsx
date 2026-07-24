@@ -15,6 +15,7 @@ import {
 import { creatureLive, creatureHitInbox } from '../game/creatureNet';
 import { chron } from '../game/chronicle';
 import { conductorState } from '../game/conductor';
+import { tryPortal } from '../game/portals';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -314,6 +315,15 @@ export const BotHorde = () => {
             const ud = h.object.userData;
             if (ud?.isFloor || ud?.isWall || ud?.isJumpPad) { groundY.current[slot] = h.point.y; break; }
           }
+        }
+        // V6 Ш4: боты тоже проваливаются в порталы (загони орду в дырку)
+        const pExit = tryPortal('bot' + b.id, b.x, b.y + 1, b.z);
+        if (pExit) {
+          b.x = pExit.x + pExit.nx * 2.5;
+          b.y = pExit.y + pExit.ny * 2.5 + 0.5;
+          b.z = pExit.z + pExit.nz * 2.5;
+          b.vy = Math.max(2, pExit.ny * 8);
+          groundY.current[slot] = -100;
         }
         b.vy -= G * dt;
         b.y += b.vy * dt;

@@ -30,6 +30,7 @@ import { gunState } from '../game/gunState';
 import { propHitInbox } from './PhysProps';
 import { totemHitInbox } from './Totems';
 import { registerKill } from '../game/combo';
+import { portalState, placePortal, tryPortal } from '../game/portals';
 
 const JUMP_FORCE = 15;
 
@@ -180,7 +181,7 @@ export const Player = () => {
         if (m) { const i = +m[1] - 1; if (i < BUILD_IDS.length) st.setEditorSelect(BUILD_IDS[i]); }
       } else if (st.buyMenuOpen) {
         // Buy menu open: digits BUY (or equip if already owned).
-        const m = e.code.match(/^Digit([1-8])$/);
+        const m = e.code.match(/^Digit([1-9])$/);
         if (m) {
           const i = +m[1] - 1;
           if (st.ownedWeapons[i]) setWeapon(i);
@@ -782,7 +783,24 @@ export const Player = () => {
 
       const center = new THREE.Vector2(0, 0);
 
-      if (spell.kind !== 'none') {
+      // ===== V6 Ш4: PORTAL RIG — LMB places portals A/B on floors/walls =====
+      if (config.portal) {
+        raycaster.current.setFromCamera(center, camera);
+        raycaster.current.far = 400;
+        const hits = raycaster.current.intersectObjects(scene.children, true);
+        raycaster.current.far = Infinity;
+        for (const h of hits) {
+          const ud = h.object.userData;
+          if ((ud?.isFloor || ud?.isWall) && h.face) {
+            _recoilVec.copy(h.face.normal).transformDirection(h.object.matrixWorld).normalize();
+            const slot = portalState.nextIsB ? 'b' : 'a';
+            portalState.nextIsB = !portalState.nextIsB;
+            placePortal(slot, h.point.x, h.point.y, h.point.z, _recoilVec.x, _recoilVec.y, _recoilVec.z);
+            socket.emit('portal', { slot, x: h.point.x, y: h.point.y, z: h.point.z, nx: _recoilVec.x, ny: _recoilVec.y, nz: _recoilVec.z });
+            break;
+          }
+        }
+      } else if (spell.kind !== 'none') {
         // ===== SPELL CAST (WS-3): the selected spell overrides the weapon shot.
         // Weapon still governs recoil/muzzle/sound above. "матрица без правил". =====
         raycaster.current.setFromCamera(center, camera);
@@ -1060,6 +1078,20 @@ export const Player = () => {
       const intersects = raycaster.current.intersectObjects(scene.children, true);
       if (intersects.length > 0) {
         useStore.getState().setCommandTarget([intersects[0].point.x, intersects[0].point.y, intersects[0].point.z]);
+      }
+    }
+
+    // ===== V6 Ш4: walk into a portal → out of the twin, speed redirected =====
+    {
+      const exit = tryPortal('me', currentPos.x, currentPos.y, currentPos.z);
+      if (exit && playerRef.current) {
+        const spd = Math.max(10, Math.hypot(_moveVel.x, newY, _moveVel.z));
+        playerRef.current.setTranslation({
+          x: exit.x + exit.nx * 2.4, y: exit.y + exit.ny * 2.4 + 0.6, z: exit.z + exit.nz * 2.4,
+        }, true);
+        playerRef.current.setLinvel({ x: exit.nx * spd, y: Math.max(4, exit.ny * spd), z: exit.nz * spd }, true);
+        addTrauma(0.1);
+        playShootSound(500, 0.12);
       }
     }
 

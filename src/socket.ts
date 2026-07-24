@@ -5,6 +5,7 @@ import { creatureHitInbox } from './game/creatureNet';
 import { voxInbox } from './game/voxCandles';
 import { roundWinReward } from './config/economy';
 import { goreInbox } from './game/voxHumanoid';
+import { placePortal } from './game/portals';
 import { botHitInbox, botFxInbox, netBots } from './game/botHorde';
 import { applyDragonHit, dragonState, dragonFxInbox, DRAGONS } from './game/voxDragon';
 
@@ -102,6 +103,12 @@ export const initMultiplayer = (roomId: string) => {
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
+  });
+
+  // --- V6 Ш4: portals — both players see and use both ---
+  channel.on('broadcast', { event: 'portal' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    placePortal(payload.slot, payload.x, payload.y, payload.z, payload.nx, payload.ny, payload.nz);
   });
 
   // --- V4.1 dragons: event-sourced HP + mount state (wild flight is analytic) ---

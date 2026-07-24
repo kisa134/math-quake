@@ -41,6 +41,7 @@ import { ShockRings } from './ShockRings';
 import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
+import { Portals } from './Portals';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -169,6 +170,7 @@ export const Game = () => {
         <PhysProps />
         <Totems />
         <ChromeIdols />
+        <Portals />
         <Creatures />
         <WorldEntities />
         <Train />
