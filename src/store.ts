@@ -76,6 +76,7 @@ interface PlayerState {
   currentWeapon: number;
   minions?: {x: number, y: number, z: number}[];
   avatar?: string; // selected third-person figure (WS-5)
+  money?: number;  // V4 TOP BAG leaderboard
 }
 
 interface GameState {

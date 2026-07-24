@@ -5,6 +5,7 @@ import { useStore } from '../store';
 import { tag } from '../game/hitTags';
 import { socket } from '../socket';
 import { addTrauma } from '../game/shake';
+import { fireKillFlash } from '../game/fx';
 import { playExplosionSound, playImpactSound } from '../utils/audio';
 import { getDudeParts, JOINTS, makeGore } from '../game/voxHumanoid';
 import {
@@ -146,6 +147,8 @@ export const BotHorde = () => {
     useStore.getState().addDebris(makeGore(b.x, b.y + b.scale, b.z, 28, 9));
     addTrauma(0.15);
     playExplosionSound();
+    // close-range kill → red HUD flash (the brutality register)
+    if (camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z)) < 12 * 12) fireKillFlash();
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
     slotOf.current.delete(b.id);

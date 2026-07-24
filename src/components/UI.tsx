@@ -3,7 +3,7 @@ import { initAudio } from '../utils/audio';
 import { initMultiplayer } from '../socket';
 import { useState, useEffect, useRef } from 'react';
 import type { CSSProperties } from 'react';
-import { onHitmarker, onFire } from '../game/fx';
+import { onHitmarker, onFire, onKillFlash } from '../game/fx';
 import { weaponName as weaponNameOf } from '../config/weapons';
 import { getAsset } from '../config/assets';
 import { WeaponHUD } from './WeaponHUD';
@@ -11,7 +11,10 @@ import { SpellWheel } from './SpellWheel';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
-  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody, money, round } = useStore();
+  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody, money, round, remotePlayers } = useStore();
+  // V4 TOP BAG: who holds the most money in the room
+  const rivalMax = Object.values(remotePlayers).reduce((m, p) => Math.max(m, p.money ?? 0), 0);
+  const iAmTop = money >= rivalMax;
   const [locked, setLocked] = useState(false);
 
   const weaponName = weaponNameOf(currentWeapon);
@@ -55,13 +58,16 @@ export const UI = () => {
             <div className="text-right">
               <span className="text-amber-300 font-black text-xs tracking-[0.3em] uppercase mb-1">Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
               <div className="text-4xl font-mono font-bold tabular-nums text-amber-200">${money}</div>
-              <div className="text-[10px] opacity-40 uppercase tracking-widest mt-1">Damage pays · rounds pay more</div>
+              <div className={`text-[10px] uppercase tracking-widest mt-1 ${iAmTop ? 'text-amber-300 font-bold' : 'opacity-40'}`}>
+                {iAmTop ? '👑 TOP BAG — YOU' : `TOP BAG $${rivalMax} — NOT YOU`}
+              </div>
             </div>
           </div>
 
           <DynamicCrosshair />
 
           <Hitmarker />
+          <KillFlash />
           <SpellWheel />
           <BuyMenu />
 
@@ -93,7 +99,7 @@ export const UI = () => {
                 <div className="text-2xl font-black italic uppercase tracking-widest bg-white text-black py-1 px-4 mb-2">
                   {editorMode ? propName : weaponName}
                 </div>
-                <div className="text-xs text-amber-200 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-5] WEAPON · [B] BUILD'}</div>
+                <div className="text-xs text-amber-200 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-8] WEAPON · [P] BUY · [B] BUILD'}</div>
               </div>
             </div>
 
@@ -134,6 +140,32 @@ export const UI = () => {
 
       {/* V3.2: all player bodies are the white voxel dude — picker retired */}
     </div>
+  );
+};
+
+// V4 brutality register: a 120ms red flash when something dies CLOSE to you.
+const KillFlash = () => {
+  const [id, setId] = useState(0);
+  useEffect(() => onKillFlash(() => setId((x) => x + 1)), []);
+  if (!id) return null;
+  return <KillFlashPulse key={id} />;
+};
+
+const KillFlashPulse = () => {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const r = requestAnimationFrame(() => setOn(true));
+    return () => cancelAnimationFrame(r);
+  }, []);
+  return (
+    <div
+      className="absolute inset-0 pointer-events-none"
+      style={{
+        background: 'radial-gradient(ellipse at center, transparent 40%, rgba(201,24,74,0.5) 100%)',
+        opacity: on ? 0 : 1,
+        transition: 'opacity 220ms ease-out',
+      }}
+    />
   );
 };
 

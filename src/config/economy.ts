@@ -8,8 +8,10 @@
  * spawns a scaled pack of bots) → all dead = round won → bigger wave.
  */
 
-// Prices by WEAPONS index: [GLITCH WAND, SCATTER SHOT, PLASMA STAFF, RAIL BLADE, DELTA DAGGER]
-export const WEAPON_PRICES = [0, 1200, 2700, 4750, 0];
+// Prices by WEAPONS index:
+// [GLITCH WAND, SCATTER SHOT, PLASMA STAFF, RAIL BLADE, DELTA DAGGER,
+//  KALASH GLITCH, SALARY SHREDDER (minigun), MARGIN CALL (deagle)]
+export const WEAPON_PRICES = [0, 1200, 2700, 4750, 0, 2900, 6500, 900];
 
 export const ECON = {
   startMoney: 800,

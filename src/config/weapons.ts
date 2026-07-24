@@ -34,6 +34,10 @@ export interface WeaponSpec {
   mScale: number; // pose scale MULTIPLIER on the normalized model (1 = vLen)
   mPos: [number, number, number];
   mRot: [number, number, number];
+  // V4 CS gunfeel:
+  spray?: [number, number][]; // fixed CS-style spray pattern (NDC offsets, climbs up); index resets after 260ms
+  heat?: boolean; // minigun: spread+rate scale with a spin-up heat 0..1
+  slow?: number;  // movement speed multiplier while firing (minigun stomp)
 }
 
 export const WEAPONS: WeaponSpec[] = [
@@ -66,6 +70,32 @@ export const WEAPONS: WeaponSpec[] = [
     tracer: 0x64dfdf, muzzle: '#c8fafa', anim: 'slash',
     model: 'weapons/dagger_01.fbx', vLen: 0.55, mScale: 1,
     mPos: [0.3, -0.38, -0.56], mRot: [0.1, 0, 0.1] },
+
+  // ── V4 БРУТАЛ: the gun rack ────────────────────────────────────────────────
+  // 6 — KALASH GLITCH: the тратата. Hard CS spray — first 2 true, then it
+  // climbs and snakes. Learn the pattern or die spraying.
+  { name: 'KALASH GLITCH', rate: 105, damage: 30, recoil: 0.16, sound: 300,
+    tracer: 0xff7b00, muzzle: '#ffc999', anim: 'pump',
+    model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.9, mScale: 1,
+    mPos: [0.3, -0.36, -0.66], mRot: [0, -1.5, 0],
+    spray: [[0, 0], [0, 0], [0, 0.006], [0.002, 0.014], [-0.003, 0.023],
+      [0.006, 0.031], [-0.008, 0.037], [0.011, 0.041], [-0.012, 0.044],
+      [0.013, 0.046], [-0.013, 0.047], [0.014, 0.048]] },
+
+  // 7 — SALARY SHREDDER: the minigun. Spin it up and hold the trigger —
+  // тататататата. You walk slow because the barrel owns you now.
+  { name: 'SALARY SHREDDER', rate: 55, damage: 9, recoil: 0.07, sound: 240,
+    spread: 0.055, tracer: 0xffd166, muzzle: '#ffe9b0', anim: 'pump',
+    model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 1.15, mScale: 1,
+    mPos: [0.3, -0.42, -0.7], mRot: [0, -1.5, 0.06],
+    heat: true, slow: 0.6 },
+
+  // 8 — MARGIN CALL: the deagle. One golden answer per question.
+  { name: 'MARGIN CALL', rate: 320, damage: 62, recoil: 0.34, sound: 150,
+    tracer: 0xe9c46a, muzzle: '#fff1c0', anim: 'slash',
+    model: 'weapons/dagger_01.fbx', vLen: 0.5, mScale: 1,
+    mPos: [0.3, -0.36, -0.55], mRot: [0.35, 0.15, 0.1],
+    spray: [[0, 0], [0.004, 0.02], [-0.006, 0.034], [0.008, 0.042]] },
 ];
 
 export const weaponName = (i: number): string => WEAPONS[i]?.name ?? 'UNKNOWN';

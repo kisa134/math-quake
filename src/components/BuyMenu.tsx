@@ -69,7 +69,7 @@ export const BuyMenu = () => {
           })}
         </div>
         <div className="text-[10px] font-mono text-white/50 mt-4 uppercase tracking-widest text-center">
-          1-5 buy / equip · P close · money = damage dealt + round wins
+          1-8 buy / equip · P close · money = damage dealt + round wins
         </div>
       </div>
     </div>

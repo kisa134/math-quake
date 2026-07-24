@@ -27,3 +27,14 @@ export function onFire(l: FireListener): () => void {
 export function fireShot(recoil = 0) {
   fireListeners.forEach((l) => l(recoil));
 }
+
+/** V4: a kill happened CLOSE to the camera — the HUD flashes red for 120ms. */
+type FlashListener = () => void;
+const flashListeners = new Set<FlashListener>();
+export function onKillFlash(l: FlashListener): () => void {
+  flashListeners.add(l);
+  return () => flashListeners.delete(l);
+}
+export function fireKillFlash() {
+  flashListeners.forEach((l) => l());
+}

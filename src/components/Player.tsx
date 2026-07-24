@@ -103,6 +103,9 @@ export const Player = () => {
   const muzzleRef = useRef<THREE.Mesh>(null);
   const muzzleFade = useRef(0);
   const recoilAmt = useRef(0);
+  // V4 CS gunfeel: spray index + minigun heat
+  const sprayIdx = useRef(0);
+  const heatRef = useRef(0);
 
   // jetpack (double-tap space)
   const jetOn = useRef(false);
@@ -164,7 +167,7 @@ export const Player = () => {
         if (m) { const i = +m[1] - 1; if (i < BUILD_IDS.length) st.setEditorSelect(BUILD_IDS[i]); }
       } else if (st.buyMenuOpen) {
         // Buy menu open: digits BUY (or equip if already owned).
-        const m = e.code.match(/^Digit([1-5])$/);
+        const m = e.code.match(/^Digit([1-8])$/);
         if (m) {
           const i = +m[1] - 1;
           if (st.ownedWeapons[i]) setWeapon(i);
@@ -444,9 +447,12 @@ export const Player = () => {
       }
     }
 
+    // V4: the minigun owns your legs — firing it slows the walk
+    const wcfgSlow = WEAPONS[currentWeapon].slow;
+    const slowMul = keys.shoot && !editorMode && wcfgSlow ? wcfgSlow : 1;
     if (grounded && !didJump) {
       applyFriction(_moveVel, delta, groundFriction); // WS-4: ice decks stay slippery
-      accelerate(_moveVel, _wishDir, hasInput ? MOVE.maxGroundSpeed : 0, MOVE.groundAccel, delta);
+      accelerate(_moveVel, _wishDir, hasInput ? MOVE.maxGroundSpeed * slowMul : 0, MOVE.groundAccel, delta);
     } else {
       // airborne (or the frame we jumped): the air-strafe engine, momentum kept
       accelerate(_moveVel, _wishDir, hasInput ? MOVE.airAccelCap : 0, MOVE.airAccel, delta);
@@ -604,10 +610,18 @@ export const Player = () => {
     // fire rate is the slower of the weapon rate and the spell cooldown.
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
-    const fireGate = Math.max(config.rate, spell.cooldown ?? 0);
-    if (!editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && now - lastShootTime > fireGate) {
+    // V4 CS gunfeel: minigun heat (spin-up rate + growing cone) + spray reset
+    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen;
+    if (config.heat) {
+      heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
+    } else if (heatRef.current > 0) heatRef.current = 0;
+    if (now - lastShootTime > 260) sprayIdx.current = 0; // let go → pattern resets
+    const effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
+    const fireGate = Math.max(effRate, spell.cooldown ?? 0);
+    if (wantsFire && now - lastShootTime > fireGate) {
       setLastShootTime(now);
-      playShootSound(config.sound, 0.05);
+      // ±8% pitch wobble — organic тратата, never robotic
+      playShootSound(config.sound * (0.92 + Math.random() * 0.16), 0.05);
       fireShot(config.recoil); // crosshair bloom + viewmodel punch
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
@@ -624,6 +638,23 @@ export const Player = () => {
       }
 
       // (viewmodel recoil punch is handled in WeaponModel via the fire event)
+
+      // brass: 2 golden shell casings kick out to the right (hitscan guns only)
+      if (!config.type && spell.kind === 'none') {
+        camera.getWorldDirection(_recoilVec);
+        const rx = -_recoilVec.z, rz = _recoilVec.x; // right = dir × up (y terms drop)
+        useStore.getState().addDebris([0, 1].map(() => ({
+          x: camera.position.x + _recoilVec.x * 0.9 + rx * 0.3,
+          y: camera.position.y - 0.25,
+          z: camera.position.z + _recoilVec.z * 0.9 + rz * 0.3,
+          vx: rx * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
+          vy: 1.6 + Math.random() * 1.2,
+          vz: rz * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
+          color: '#e9c46a', size: 0.055 + Math.random() * 0.035,
+          rx: Math.random() * 8, ry: Math.random() * 8, rz: Math.random() * 8,
+          life: 650 + Math.random() * 250,
+        })));
+      }
 
       const center = new THREE.Vector2(0, 0);
 
@@ -742,13 +773,21 @@ export const Player = () => {
         let anyEnemyHit = false;
         let anyKill = false;
 
+        // V4 CS spray: fixed pattern climbs while you hold the trigger
+        const sprayOff = config.spray
+          ? config.spray[Math.min(sprayIdx.current, config.spray.length - 1)]
+          : null;
+        sprayIdx.current++;
+        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) : 0;
+
         for (let r = 0; r < raysToFire; r++) {
           let spreadX = 0;
           let spreadY = 0;
-          if (config.spread) {
-            spreadX = (Math.random() - 0.5) * config.spread;
-            spreadY = (Math.random() - 0.5) * config.spread;
+          if (effSpread) {
+            spreadX = (Math.random() - 0.5) * effSpread;
+            spreadY = (Math.random() - 0.5) * effSpread;
           }
+          if (sprayOff) { spreadX += sprayOff[0]; spreadY += sprayOff[1]; }
 
           raycaster.current.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
           const intersects = raycaster.current.intersectObjects(scene.children, true);
@@ -888,7 +927,8 @@ export const Player = () => {
         isShooting: keys.shoot,
         currentWeapon: currentWeapon,
         minions: useStore.getState().localMinions,
-        avatar: useStore.getState().avatarId
+        avatar: useStore.getState().avatarId,
+        money: useStore.getState().money
       });
     }
   });
