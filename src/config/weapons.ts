@@ -45,31 +45,31 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'GLITCH WAND', rate: 110, damage: 14, recoil: 0.1, sound: 800,
     tracer: 0x00f5d4, muzzle: '#bff9ff', anim: 'thrust',
     model: 'weapons/wand_01.fbx', vLen: 0.7, mScale: 1,
-    mPos: [0.34, -0.42, -0.68], mRot: [0.2, 0.1, 0] },
+    mPos: [0.29, -0.34, -0.52], mRot: [0.12, 0.06, 0] },
 
   // 2 — SCATTER SHOT: shotgun spread, amber. 8 pellets of margin call.
   { name: 'SCATTER SHOT', rate: 800, damage: 10, recoil: 0.4, sound: 200,
     spread: 0.1, rays: 8, tracer: 0xffb703, muzzle: '#ffd27a', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.8, mScale: 1,
-    mPos: [0.32, -0.38, -0.62], mRot: [0, -1.5, 0] },
+    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
 
   // 3 — PLASMA STAFF: projectile caster, magenta. The workhorse bolt-thrower.
   { name: 'PLASMA STAFF', rate: 400, damage: 40, recoil: 0.2, sound: 400,
     type: 'projectile', tracer: 0xb5179e, muzzle: '#ff8be0', anim: 'thrust',
     model: 'weapons/SM_Wep_Staff_02.fbx', vLen: 0.95, mScale: 1,
-    mPos: [0.36, -0.46, -0.72], mRot: [0.2, 0.1, 0] },
+    mPos: [0.31, -0.38, -0.56], mRot: [0.12, 0.06, 0] },
 
   // 4 — RAIL BLADE: slow thick railgun, mint. One swing, one delete.
   { name: 'RAIL BLADE', rate: 1500, damage: 120, recoil: 0.6, sound: 100,
     thick: true, tracer: 0x9bffc4, muzzle: '#e8ffe8', anim: 'swing',
     model: 'weapons/SM_Wep_Sword_Large_01.fbx', vLen: 0.9, mScale: 1,
-    mPos: [0.32, -0.4, -0.7], mRot: [0.1, 0, 0.12] },
+    mPos: [0.29, -0.35, -0.54], mRot: [0.08, 0, 0.1] },
 
   // 5 — DELTA DAGGER: the owner's favorite. Fastest fire in the matrix, aqua.
   { name: 'DELTA DAGGER', rate: 70, damage: 12, recoil: 0.05, sound: 820,
     tracer: 0x64dfdf, muzzle: '#c8fafa', anim: 'slash',
     model: 'weapons/dagger_01.fbx', vLen: 0.55, mScale: 1,
-    mPos: [0.3, -0.38, -0.56], mRot: [0.1, 0, 0.1] },
+    mPos: [0.27, -0.33, -0.46], mRot: [0.08, 0, 0.08] },
 
   // ── V4 БРУТАЛ: the gun rack ────────────────────────────────────────────────
   // 6 — KALASH GLITCH: the тратата. Hard CS spray — first 2 true, then it
@@ -77,7 +77,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'KALASH GLITCH', rate: 105, damage: 30, recoil: 0.16, sound: 300,
     tracer: 0xff7b00, muzzle: '#ffc999', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.9, mScale: 1,
-    mPos: [0.3, -0.36, -0.66], mRot: [0, -1.5, 0],
+    mPos: [0.28, -0.3, -0.52], mRot: [0, -1.5, 0],
     spray: [[0, 0], [0, 0], [0, 0.006], [0.002, 0.014], [-0.003, 0.023],
       [0.006, 0.031], [-0.008, 0.037], [0.011, 0.041], [-0.012, 0.044],
       [0.013, 0.046], [-0.013, 0.047], [0.014, 0.048]] },
@@ -87,14 +87,14 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'SALARY SHREDDER', rate: 55, damage: 9, recoil: 0.07, sound: 240,
     spread: 0.055, tracer: 0xffd166, muzzle: '#ffe9b0', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 1.15, mScale: 1,
-    mPos: [0.3, -0.42, -0.7], mRot: [0, -1.5, 0.06],
+    mPos: [0.3, -0.36, -0.56], mRot: [0, -1.5, 0.05],
     heat: true, slow: 0.6 },
 
   // 8 — MARGIN CALL: the deagle. One golden answer per question.
   { name: 'MARGIN CALL', rate: 320, damage: 62, recoil: 0.34, sound: 150,
     tracer: 0xe9c46a, muzzle: '#fff1c0', anim: 'slash',
     model: 'weapons/dagger_01.fbx', vLen: 0.5, mScale: 1,
-    mPos: [0.3, -0.36, -0.55], mRot: [0.35, 0.15, 0.1],
+    mPos: [0.27, -0.32, -0.46], mRot: [0.3, 0.12, 0.08],
     spray: [[0, 0], [0.004, 0.02], [-0.006, 0.034], [0.008, 0.042]] },
 ];
 

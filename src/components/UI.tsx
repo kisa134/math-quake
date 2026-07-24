@@ -7,6 +7,9 @@ import { onHitmarker, onFire, onKillFlash } from '../game/fx';
 import { weaponName as weaponNameOf } from '../config/weapons';
 import { getAsset } from '../config/assets';
 import { accentHex } from '../game/accent';
+import { gunState } from '../game/gunState';
+import { chronicle } from '../game/chronicle';
+import { combo } from '../game/combo';
 import { WeaponHUD } from './WeaponHUD';
 import { SpellWheel } from './SpellWheel';
 import { BuyMenu } from './BuyMenu';
@@ -70,6 +73,8 @@ export const UI = () => {
           <Hitmarker />
           <KillFlash />
           <BuffBadges />
+          <ChronicleFeed />
+          <ComboBadge />
           <SpellWheel />
           <BuyMenu />
 
@@ -141,6 +146,52 @@ export const UI = () => {
       )}
 
       {/* V3.2: all player bodies are the white voxel dude — picker retired */}
+    </div>
+  );
+};
+
+// V5 C6 — the world narrates itself: last 3 chronicle lines, bottom-left.
+const ChronicleFeed = () => {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => force((x) => x + 1), 900);
+    return () => clearInterval(iv);
+  }, []);
+  const now = Date.now();
+  const items = chronicle.filter((c) => now - c.t < 9000).slice(-3);
+  if (!items.length) return null;
+  return (
+    <div className="absolute left-8 bottom-40 flex flex-col gap-1 pointer-events-none">
+      {items.map((c, i) => (
+        <div
+          key={c.t + i}
+          className="text-[11px] font-mono uppercase tracking-widest"
+          style={{ color: 'var(--accent, #c8b273)', opacity: 0.35 + 0.65 * (1 - (now - c.t) / 9000) }}
+        >
+          {c.msg}
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// V5 C10 — kill combo badge near the crosshair (×2…×N, fades with the window).
+const ComboBadge = () => {
+  const [, force] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => force((x) => x + 1), 250);
+    return () => clearInterval(iv);
+  }, []);
+  const now = Date.now();
+  if (combo.n < 2 || now > combo.until) return null;
+  return (
+    <div className="absolute left-1/2 top-[56%] -translate-x-1/2 pointer-events-none">
+      <div
+        className="font-black italic text-2xl tracking-tighter"
+        style={{ color: 'var(--accent, #c8b273)', textShadow: '0 0 12px currentColor' }}
+      >
+        ×{combo.n} COMBO
+      </div>
     </div>
   );
 };
@@ -224,7 +275,8 @@ const DynamicCrosshair = () => {
       bloom.current = Math.max(0, bloom.current - 0.055);
       const el = rootRef.current;
       if (el) {
-        const gap = 5 + bloom.current * 15; // px each tick is pushed from center
+        // V5 C1 CS gap: shooting bloom + run speed + current spray inaccuracy
+        const gap = 4 + bloom.current * 13 + Math.min(9, gunState.speed * 0.22) + gunState.spread * 14;
         el.style.setProperty('--g', `${gap}px`);
         el.style.opacity = String(0.75 + bloom.current * 0.25);
         el.style.color = accentHex.v; // V5: the crosshair wears the market accent

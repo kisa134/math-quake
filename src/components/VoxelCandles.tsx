@@ -10,6 +10,7 @@ import {
   generateVoxCandles, voxDebris, voxInbox, VOX_SIZE, COLLAPSE_AT, BLACK_HOLE,
   candleLivePos, moodGain, fateOf, warpTime, conductorState, type VoxCandle,
 } from '../game/voxCandles';
+import { orbSpawnInbox, ringInbox } from '../game/botHorde';
 import type { CandleEvent } from '../game/conductor';
 
 /**
@@ -188,6 +189,9 @@ export const VoxelCandles = () => {
     if (chunks.length) useStore.getState().addDebris(chunks);
     addTrauma(0.2);
     playExplosionSound();
+    // V5 C5: a broken soul drops CASH (personal loot) + a shockwave ring
+    orbSpawnInbox.push({ x: bx, y: by + 1, z: bz, kind: 'cash' });
+    ringInbox.push({ x: bx, y: by, z: bz });
   };
 
   useFrame((state, dt) => {

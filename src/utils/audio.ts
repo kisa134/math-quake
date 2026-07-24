@@ -1,5 +1,9 @@
 let audioCtx: AudioContext | null = null;
 let ambientOn = false;
+// V5 C8: the drone follows the market epoch (refs kept for live re-tuning)
+let ambientFilter: BiquadFilterNode | null = null;
+let ambientBus: GainNode | null = null;
+let ambientLfo: OscillatorNode | null = null;
 
 export const initAudio = () => {
   if (!audioCtx) {
@@ -27,6 +31,8 @@ const startAmbient = () => {
   filter.Q.value = 4;
   bus.connect(filter);
   filter.connect(audioCtx.destination);
+  ambientBus = bus;
+  ambientFilter = filter;
 
   for (const [freq, type] of [[55, 'sine'], [82.5, 'triangle']] as const) {
     const osc = audioCtx.createOscillator();
@@ -44,6 +50,20 @@ const startAmbient = () => {
   lfo.connect(lfoGain);
   lfoGain.connect(filter.frequency);
   lfo.start(t);
+  ambientLfo = lfo;
+};
+
+// V5 C8 — the drone follows the market: brighter+faster into euphoria, choked
+// and slow in capitulation's dread, almost gone in silence. 2s ramps.
+const MOOD_CUTOFF = [320, 430, 540, 380, 240, 180];
+const MOOD_GAIN = [0.05, 0.06, 0.07, 0.05, 0.065, 0.028];
+const MOOD_LFO = [0.07, 0.11, 0.16, 0.13, 0.24, 0.045];
+export const setAmbientMood = (epoch: number) => {
+  if (!audioCtx || !ambientFilter || !ambientBus || !ambientLfo) return;
+  const t = audioCtx.currentTime;
+  ambientFilter.frequency.linearRampToValueAtTime(MOOD_CUTOFF[epoch] ?? 320, t + 2);
+  ambientBus.gain.linearRampToValueAtTime(MOOD_GAIN[epoch] ?? 0.05, t + 2);
+  ambientLfo.frequency.linearRampToValueAtTime(MOOD_LFO[epoch] ?? 0.07, t + 2);
 };
 
 // Crisp high blip for a landed hit — the audible half of the hitmarker.

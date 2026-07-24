@@ -30,6 +30,8 @@ export const MUTATIONS: MutationSpec[] = [
   { id: 'GIANT',   color: '#8d99ae', scale: 1.8, hp: 300, speed: 4,   behavior: 'tank',   weight: 4 },
   // Пожиратель: не выпадает случайно — приходит по расписанию раундов.
   { id: 'DEVOURER', color: '#12060c', scale: 3.2, hp: 900, speed: 3.2, behavior: 'devour', weight: 0 },
+  // V5 C7: БОСС ЭПОХИ — Медведь-Архонт. Приходит в КАПИТУЛЯЦИЮ, кримзон-гигант.
+  { id: 'ARCHON', color: '#ff2d55', scale: 2.6, hp: 1500, speed: 5, behavior: 'tank', weight: 0 },
 ];
 export const MUT_BY_ID: Record<string, MutationSpec> = Object.fromEntries(MUTATIONS.map((m) => [m.id, m]));
 
@@ -81,7 +83,11 @@ export function makeBot(mut: MutationSpec, x: number, y: number, z: number): Bot
 export const botHitInbox: { id: number; damage: number }[] = [];
 export const botFxInbox: { x: number; y: number; z: number; big: boolean }[] = [];
 // V4.1 dopamine: bot deaths sometimes drop a personal buff orb (client-local loot)
-export const orbSpawnInbox: { x: number; y: number; z: number }[] = [];
+export const orbSpawnInbox: { x: number; y: number; z: number; kind?: 'buff' | 'cash' }[] = [];
+// V5 C2: close deaths become REAL ragdolls (dx/dz = impulse direction)
+export const ragdollInbox: { x: number; y: number; z: number; dx: number; dz: number; scale: number }[] = [];
+// V5 C4: shockwave rings at deaths/explosions
+export const ringInbox: { x: number; y: number; z: number }[] = [];
 
 // Non-host mirror snapshot (socket writes, BotHorde renders when !isHost)
 export interface NetBot {

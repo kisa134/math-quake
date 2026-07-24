@@ -29,10 +29,16 @@ import { socket } from '../socket';
 import { MATCH, wavesSize, roundWinReward } from '../config/economy';
 import { conductorState } from '../game/conductor';
 import { updateAccent } from '../game/accent';
+import { chron, EPOCH_CHRONICLE } from '../game/chronicle';
+import { setAmbientMood } from '../utils/audio';
 import { BotHorde } from './BotHorde';
 import { spawnBotWave, aliveBotCount } from './BotHorde';
 import { Dragons } from './Dragons';
 import { BuffOrbs } from './BuffOrbs';
+import { Ragdolls } from './Ragdolls';
+import { ShockRings } from './ShockRings';
+import { PhysProps } from './PhysProps';
+import { Totems } from './Totems';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -40,10 +46,18 @@ import { BuffOrbs } from './BuffOrbs';
  * everyone gets the win bonus → next BUY. Peers mirror phase via 'round' and
  * pay themselves the bonus on 'roundwin' (money is client-local like HP).
  */
-/** V5: the market conducts THE ONE ACCENT COLOR of the whole world. */
+/** V5: the market conducts THE ONE ACCENT COLOR of the world — plus the
+ *  chronicle line and the ambient drone on every epoch turn. */
+let _lastEpoch = -1;
 const AccentDriver = () => {
   useFrame((state, dt) => {
-    updateAccent(conductorState(state.clock.elapsedTime).epoch, dt, performance.now());
+    const cs = conductorState(state.clock.elapsedTime);
+    updateAccent(cs.epoch, dt, performance.now());
+    if (cs.epoch !== _lastEpoch) {
+      _lastEpoch = cs.epoch;
+      chron(EPOCH_CHRONICLE[cs.epoch]);
+      setAmbientMood(cs.epoch);
+    }
   });
   return null;
 };
@@ -147,6 +161,10 @@ export const Game = () => {
         <BotHorde />
         <Dragons />
         <BuffOrbs />
+        <Ragdolls />
+        <ShockRings />
+        <PhysProps />
+        <Totems />
         <Creatures />
         <WorldEntities />
         <Train />

@@ -10,9 +10,11 @@ import { playExplosionSound, playImpactSound } from '../utils/audio';
 import { getDudeParts, JOINTS, makeGore } from '../game/voxHumanoid';
 import {
   MUTATIONS, MUT_BY_ID, rollMutation, makeBot, botHitInbox, botFxInbox, netBots,
-  orbSpawnInbox, BOT_CAP, type Bot,
+  orbSpawnInbox, ragdollInbox, ringInbox, BOT_CAP, type Bot,
 } from '../game/botHorde';
 import { creatureLive, creatureHitInbox } from '../game/creatureNet';
+import { chron } from '../game/chronicle';
+import { conductorState } from '../game/conductor';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -111,6 +113,7 @@ export const BotHorde = () => {
   const lastPainted = useRef<Map<number, string>>(new Map());
   const rrFrame = useRef(0);
   const lastSync = useRef(0);
+  const archonEpoch = useRef(-1); // V5 C7: one Archon per scheduled capitulation
 
   useLayoutEffect(() => {
     for (const m of [headRef.current, torsoRef.current, armsRef.current, legsRef.current]) {
@@ -149,9 +152,20 @@ export const BotHorde = () => {
     addTrauma(0.2);
     playExplosionSound();
     // close-range kill → red HUD flash (the brutality register)
-    if (camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z)) < 16 * 16) fireKillFlash();
+    const dSq = camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z));
+    if (dSq < 16 * 16) fireKillFlash();
+    // V5 C2: close deaths become REAL ragdolls (impulse away from the camera)
+    if (dSq < 45 * 45) {
+      const dx = b.x - camera.position.x, dz = b.z - camera.position.z;
+      const l = Math.hypot(dx, dz) || 1;
+      ragdollInbox.push({ x: b.x, y: b.y, z: b.z, dx: dx / l, dz: dz / l, scale: b.scale });
+    }
+    // V5 C4: shockwave ring at every death
+    ringInbox.push({ x: b.x, y: b.y + 0.5, z: b.z });
     // dopamine: 22% chance the corpse drops a buff orb (personal loot)
     if (Math.random() < 0.22) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
+    // chronicle: the world narrates its violence
+    chron(b.mut === 'ARCHON' ? '☠ МЕДВЕДЬ-АРХОНТ ПАЛ' : b.mut === 'DEVOURER' ? '☠ ПОЖИРАТЕЛЬ насытился навсегда' : `${b.mut} разлетелся вокселями`);
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
     slotOf.current.delete(b.id);
@@ -198,6 +212,19 @@ export const BotHorde = () => {
           const slot = slotOf.current.get(b.id);
           if (slot !== undefined) killBot(b, slot);
         }
+      }
+
+      // V5 C7: БОСС — every second CAPITULATION summons the Bear-Archon
+      const cs = conductorState(state.clock.elapsedTime);
+      if (cs.epoch === 4 && Math.floor(cs.epochIdx / 6) % 2 === 0 && archonEpoch.current !== cs.epochIdx && bots.current.length < BOT_CAP) {
+        archonEpoch.current = cs.epochIdx;
+        const boss = makeBot(MUT_BY_ID['ARCHON'], 0 + (Math.random() - 0.5) * 20, 90, 0 + (Math.random() - 0.5) * 20);
+        bots.current.push(boss);
+        slotOf.current.clear();
+        bots.current.forEach((b, i) => slotOf.current.set(b.id, i));
+        lastPainted.current.clear();
+        chron('† МЕДВЕДЬ-АРХОНТ ПРИШЁЛ ЗА ТОБОЙ');
+        addTrauma(0.25);
       }
 
       // sim

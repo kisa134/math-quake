@@ -26,6 +26,10 @@ import { botHitInbox } from '../game/botHorde';
 import { tryMountDragon, dragonRide } from './Dragons';
 import { DRAGONS, dragonAlive, applyDragonHit, dragonFxInbox, RAINBOW, FOAM } from '../game/voxDragon';
 import { makeFlames as makePixelFlames } from '../game/voxel';
+import { gunState } from '../game/gunState';
+import { propHitInbox } from './PhysProps';
+import { totemHitInbox } from './Totems';
+import { registerKill } from '../game/combo';
 
 const JUMP_FORCE = 15;
 
@@ -405,6 +409,9 @@ export const Player = () => {
     // the core of the swing euphoria). Smoothed so it never snaps.
     {
       const spd = Math.hypot(velocity.x, velocity.z);
+      // V5 C1: feed the CS crosshair (gap breathes with run + spray + heat)
+      gunState.speed = spd;
+      gunState.spread = Math.min(1, sprayIdx.current * 0.09 + heatRef.current * 0.6);
       const speedFov = Math.min(11, Math.max(0, (spd - 26) * 0.18));
       const target = 80 + recoilAmt.current * 5 + speedFov;
       smoothFov.current += (target - smoothFov.current) * Math.min(1, delta * 7);
@@ -837,7 +844,7 @@ export const Player = () => {
           }
           if (anyHit) {
             fireHitmarker(anyKill);
-            if (anyKill) { playExplosionSound(); useStore.getState().addMoney(ECON.killBonus); }
+            if (anyKill) { playExplosionSound(); useStore.getState().addMoney(Math.round(ECON.killBonus * registerKill())); }
             else playHitTick();
           }
         } else if (spell.kind === 'nova') {
@@ -963,6 +970,21 @@ export const Player = () => {
               }
               obj = obj.parent;
             }
+            // V5 C3: vice totems take damage → the rain of coins
+            if (hitObj.object.userData?.isTotem) {
+              totemHitInbox.push({ id: +hitObj.object.userData.id, damage: config.damage });
+              _endPoint.copy(hitObj.point);
+              useStore.getState().addDebris(makeFlames([hitObj.point.x, hitObj.point.y, hitObj.point.z], '#e9c46a', 3));
+              break;
+            }
+            // V5 C9: crates take the shot's impulse and FLY
+            if (hitObj.object.userData?.isProp) {
+              const d = raycaster.current.ray.direction;
+              propHitInbox.push({ id: +hitObj.object.userData.id, damage: config.damage, dx: d.x, dy: d.y, dz: d.z });
+              _endPoint.copy(hitObj.point);
+              useStore.getState().addDebris(makeFlames([hitObj.point.x, hitObj.point.y, hitObj.point.z], config.muzzle, 3));
+              break;
+            }
             if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
               _endPoint.copy(hitObj.point);
 
@@ -1022,8 +1044,11 @@ export const Player = () => {
         // kill, else a white hitmarker + crisp tick. Kills pay the CS bonus.
         if (anyEnemyHit) {
           fireHitmarker(anyKill);
-          if (anyKill) { playExplosionSound(); useStore.getState().addMoney(ECON.killBonus); }
-          else playHitTick();
+          if (anyKill) {
+            playExplosionSound();
+            // V5 C10: chained kills pay MORE (×1 → ×3)
+            useStore.getState().addMoney(Math.round(ECON.killBonus * registerKill()));
+          } else playHitTick();
         }
       }
     }

@@ -13,9 +13,10 @@ import { playJumpSound } from '../utils/audio';
  *   MIDAS (gold)    — money gained ×2, 15s
  * Orbs float + spin, despawn after 20s. ≤10 alive; plain meshes (cheap).
  */
-interface Orb { id: number; type: 'rage' | 'surge' | 'midas'; x: number; y: number; z: number; born: number }
-const ORB_COLORS: Record<Orb['type'], string> = { rage: '#e63946', surge: '#00b4d8', midas: '#ffd166' };
-const ORB_DUR: Record<Orb['type'], number> = { rage: 12000, surge: 12000, midas: 15000 };
+interface Orb { id: number; type: 'rage' | 'surge' | 'midas' | 'cash'; x: number; y: number; z: number; born: number }
+const ORB_COLORS: Record<Orb['type'], string> = { rage: '#e63946', surge: '#00b4d8', midas: '#ffd166', cash: '#ffe8b0' };
+const ORB_DUR: Record<Orb['type'], number> = { rage: 12000, surge: 12000, midas: 15000, cash: 0 };
+const CASH_VALUE = 250; // V5 C5: broken candle-souls drop money
 let nextOrb = 1;
 
 export const BuffOrbs = () => {
@@ -29,7 +30,8 @@ export const BuffOrbs = () => {
     while (orbSpawnInbox.length) {
       const s = orbSpawnInbox.pop()!;
       const roll = Math.random();
-      const type: Orb['type'] = roll < 0.34 ? 'rage' : roll < 0.67 ? 'surge' : 'midas';
+      const type: Orb['type'] = s.kind === 'cash' ? 'cash'
+        : roll < 0.34 ? 'rage' : roll < 0.67 ? 'surge' : 'midas';
       (changed ??= [...orbs]).push({ id: nextOrb++, type, x: s.x, y: s.y, z: s.z, born: Date.now() });
       if (changed.length > 10) changed.shift();
     }
@@ -45,7 +47,8 @@ export const BuffOrbs = () => {
       }
       const dx = camera.position.x - o.x, dy = camera.position.y - o.y, dz = camera.position.z - o.z;
       if (dx * dx + dy * dy + dz * dz < 2.6 * 2.6) {
-        useStore.getState().setBuff(o.type, now + ORB_DUR[o.type]);
+        if (o.type === 'cash') useStore.getState().addMoney(CASH_VALUE);
+        else useStore.getState().setBuff(o.type, now + ORB_DUR[o.type]);
         playJumpSound();
         (picked ??= []).push(o.id);
       } else if (now - o.born > 20000) {

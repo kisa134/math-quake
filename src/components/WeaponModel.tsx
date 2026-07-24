@@ -120,8 +120,8 @@ export const WeaponModel = ({ weapon }: { weapon: number }) => {
         light.intensity = 2.5 * (1 + 0.08 * Math.sin(clock.current * 3)) + p * 2.2;
       }
     }
-    // Snappy attack already applied on the fire event; fast spring-back out.
-    punch.current = Math.max(0, punch.current - delta * 8);
+    // V5 C1 CS recovery: snappier spring-back — the barrel «доводится» home.
+    punch.current = Math.max(0, punch.current - delta * 11);
   });
 
   return (
