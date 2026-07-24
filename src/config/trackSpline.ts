@@ -9,16 +9,16 @@ import * as THREE from 'three';
  * (movement + rail tube) and any future minimap read THIS curve.
  */
 const TRACK_POINTS: [number, number, number][] = [
-  [230, 95, 10],     // east — cruising height
-  [185, 145, 150],   // climb NE
-  [60, 200, 235],    // summit north — highest point of the loop
-  [-95, 165, 215],   // start of the big dive
-  [-215, 105, 120],  // diving west
-  [-265, 65, -35],   // valley west — lowest + fastest
-  [-180, 62, -180],  // low sweep SW
-  [-40, 100, -245],  // climbing south
-  [125, 155, -205],  // high bank SE
-  [235, 125, -90],   // descending back to start
+  [920, 190, 40],     // east — cruising height
+  [740, 290, 600],   // climb NE
+  [240, 400, 940],    // summit north — highest point of the loop
+  [-380, 330, 860],   // start of the big dive
+  [-860, 210, 480],  // diving west
+  [-1060, 130, -140],   // valley west — lowest + fastest
+  [-720, 124, -720],  // low sweep SW
+  [-160, 200, -980],  // climbing south
+  [500, 310, -820],  // high bank SE
+  [940, 250, -360],   // descending back to start
 ];
 
 export const TRACK_CURVE = new THREE.CatmullRomCurve3(

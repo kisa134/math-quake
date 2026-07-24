@@ -107,7 +107,7 @@ export function conductorState(t: number): ConductorState {
   const crossUp = e === 1 ? Math.min(1, (eT - T0[1]) / 4) : e === 2 ? 1 : 0;
   const crossDn = e === 3 ? Math.min(1, (eT - T0[3]) / 2.5) : (e === 4 || e === 5 || e === 0) ? 1 : 0;
   const cross = Math.max(0, crossUp - (e >= 3 || e === 0 ? crossDn : 0));
-  _state.ma20R = 120 + 170 * (e === 1 || e === 2 ? cross : 0);
+  _state.ma20R = 500 + 700 * (e === 1 || e === 2 ? cross : 0); // V6 giga radii
   return _state;
 }
 

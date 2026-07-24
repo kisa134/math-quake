@@ -9,8 +9,8 @@ export const TRAIN = {
   diveGain: 60,     // extra u/s per unit of downward tangent (dive = screaming)
   climbLoss: 18,    // u/s lost per unit of upward tangent (climb = grinding)
   minSpeed: 10,
-  maxSpeed: 72,
-  accelRate: 20,    // how fast actual speed chases the profile target (u/s²)
+  maxSpeed: 160,   // V6 giga dive
+  accelRate: 40,    // how fast actual speed chases the profile target (u/s²)
   carSpacing: 15,   // arc-length between car centers (loco + wagons)
   carCount: 4,      // 1 locomotive + 3 wagons
   railRadius: 0.6,  // visual tube thickness
@@ -30,9 +30,9 @@ export function trainTargetSpeed(tangentY: number): number {
 
 // ----------------------------------------------------------------- CARS -----
 export const CAR = {
-  accel: 48,          // u/s² forward push while W held
+  accel: 70,          // u/s² forward push while W held
   reverseAccel: 26,   // u/s² while S held (braking / reversing)
-  maxSpeed: 42,       // horizontal speed clamp
+  maxSpeed: 78,    // V6       // horizontal speed clamp
   maxReverse: 14,     // reverse speed clamp (along -forward)
   turnRate: 2.7,      // rad/s yaw at full steer (scaled down at low speed)
   driftTurnBonus: 1.4,  // extra steering authority while the handbrake is down

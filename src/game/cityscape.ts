@@ -125,17 +125,17 @@ export function generateCity(seed = CITY_SEED): CityData {
       color: TOWER_TINTS[Math.floor(rnd() * TOWER_TINTS.length)],
     });
     // 1–3 vertical emissive strips on random faces.
-    const nStrips = 1 + (rnd() < 0.7 ? 1 : 0) + (h > 400 ? 1 : 0);
+    const nStrips = 1 + (rnd() < 0.7 ? 1 : 0) + (h > 1500 ? 1 : 0);
     for (let s = 0; s < nStrips; s++) {
       const face = Math.floor(rnd() * 4);
       const along = (rnd() - 0.5) * 0.7; // offset along the face
       const sh = h * (0.55 + rnd() * 0.35);
       const sy = GROUND_Y + sh / 2 + h * 0.08;
-      let sx = x, sz = z, sw = 1.3, sd = 1.3;
-      if (face === 0) { sx = x + w / 2 + 0.4; sz = z + d * along; sd = 1.1; }
-      else if (face === 1) { sx = x - w / 2 - 0.4; sz = z + d * along; sd = 1.1; }
-      else if (face === 2) { sz = z + d / 2 + 0.4; sx = x + w * along; sw = 1.1; }
-      else { sz = z - d / 2 - 0.4; sx = x + w * along; sw = 1.1; }
+      let sx = x, sz = z, sw = 3.2, sd = 3.2;
+      if (face === 0) { sx = x + w / 2 + 0.9; sz = z + d * along; sd = 2.8; }
+      else if (face === 1) { sx = x - w / 2 - 0.9; sz = z + d * along; sd = 2.8; }
+      else if (face === 2) { sz = z + d / 2 + 0.9; sx = x + w * along; sw = 2.8; }
+      else { sz = z - d / 2 - 0.9; sx = x + w * along; sw = 2.8; }
       strips.push({ pos: [sx, sy, sz], scale: [sw, sh, sd], color: NEON[Math.floor(rnd() * NEON.length)] });
     }
     if (cap) {
@@ -151,33 +151,33 @@ export function generateCity(seed = CITY_SEED): CityData {
   const clusters: Array<[number, number]> = [];
   for (let c = 0; c < 12; c++) {
     const a = rnd() * Math.PI * 2;
-    const r = 360 + rnd() * 700;
+    const r = 900 + rnd() * 1700;
     clusters.push([Math.cos(a) * r, Math.sin(a) * r]);
   }
 
-  const BUILDING_TARGET = 430;
+  const BUILDING_TARGET = 650;
   let placed = 0;
   let guard = 0;
   while (placed < BUILDING_TARGET && guard++ < BUILDING_TARGET * 6) {
     let x: number, z: number;
     if (rnd() < 0.6) {
       const [cx, cz] = clusters[Math.floor(rnd() * clusters.length)];
-      x = cx + (rnd() - 0.5) * 220;
-      z = cz + (rnd() - 0.5) * 220;
+      x = cx + (rnd() - 0.5) * 450;
+      z = cz + (rnd() - 0.5) * 450;
     } else {
       const a = rnd() * Math.PI * 2;
-      const r = 300 + 850 * Math.pow(rnd(), 0.8);
+      const r = 800 + 2000 * Math.pow(rnd(), 0.8);
       x = Math.cos(a) * r;
       z = Math.sin(a) * r;
     }
     const r = Math.hypot(x, z);
-    if (r < 300 || r > 1150) continue;
+    if (r < 800 || r > 2800) continue;
     if (TEMPLES.some(([tx, tz]) => Math.max(Math.abs(x - tx), Math.abs(z - tz)) < 75)) continue;
 
-    let h = 60 + rnd() * rnd() * 180;             // 60–240 base skyline
-    if (rnd() < 0.16) h = 320 + rnd() * 680;      // supertall spikes → up to 1000
-    const w = 14 + rnd() * 30;
-    const d = 14 + rnd() * 30;
+    let h = 150 + rnd() * rnd() * 600;            // V6: 150–750 base skyline
+    if (rnd() < 0.14) h = 1200 + rnd() * 3800;    // V6: supertalls → up to 5000
+    const w = 30 + rnd() * 60;
+    const d = 30 + rnd() * 60;
     addBuilding(x, z, w, h, d, true);
     placed++;
   }
@@ -187,9 +187,9 @@ export function generateCity(seed = CITY_SEED): CityData {
   for (let i = 0; i < towers.length && spurs < 12; i += 7) {
     const t = towers[i];
     const h = t.scale[1];
-    if (h < 150 || h > 720) continue;
+    if (h < 400 || h > 2600) continue;
     const side = Math.min(t.scale[0], t.scale[2]) * 0.8;
-    const s = Math.min(side, 14);
+    const s = Math.min(side, 20);
     const ice = spurs % 3 === 2;
     const metal = spurs % 4 === 1;
     climb.push({
@@ -210,9 +210,9 @@ export function generateCity(seed = CITY_SEED): CityData {
   let y = 95;
   for (let i = 0; i < STATIONS; i++) {
     const angle = 0.6 + i * GOLDEN;
-    const radius = 100 + 55 * Math.sin(i * 0.9) + i * 5; // ~100 → ~220, wobbled
+    const radius = 260 + 140 * Math.sin(i * 0.9) + i * 12; // V6: ~260 → ~620
     stationPos.push([Math.cos(angle) * radius, y, Math.sin(angle) * radius]);
-    y += 55 + rnd() * 8; // 55–63 per hop → last station ≈ 950
+    y += 72 + rnd() * 10; // V6: последняя станция ≈ 1250
   }
 
   // Bridge from the central temple (spawn y=84) out to station 0.
@@ -281,17 +281,17 @@ export function generateCity(seed = CITY_SEED): CityData {
 
   // --- 4 giant planet set-pieces spread through the city volume ------------
   const planets: PlanetSpot[] = [
-    { assetId: 'skull',  pos: [ 190, 150, -170], scale: 45, spin: 0.06 },
-    { assetId: 'bomber', pos: [-280, 350,  210], scale: 60, spin: 0.045 },
-    { assetId: 'zombie', pos: [ 260, 600,  260], scale: 72, spin: 0.035 },
-    { assetId: 'throne', pos: [  20, 850, -300], scale: 88, spin: 0.028 },
+    { assetId: 'skull',  pos: [ 480, 380, -430], scale: 120, spin: 0.06 },
+    { assetId: 'bomber', pos: [-700, 800,  530], scale: 160, spin: 0.045 },
+    { assetId: 'zombie', pos: [ 650, 1400, 650], scale: 190, spin: 0.035 },
+    { assetId: 'throne', pos: [  50, 2000, -760], scale: 230, spin: 0.028 },
   ];
 
   // --- floating candle swarms (the trading-terminal explosion) -------------
   const bulls: CandleInst[] = [];
   const bears: CandleInst[] = [];
   const swarmCenters: Array<[number, number, number]> = [
-    [0, 300, 0], // core blast above the arena
+    [0, 900, 0], // core blast — на высоте пончика
     ...planets.map((p) => p.pos),
   ];
   const CANDLE_COUNT = 320;
@@ -302,16 +302,16 @@ export function generateCity(seed = CITY_SEED): CityData {
       const [wx, wy, wz] = swarmCenters[Math.floor(rnd() * swarmCenters.length)];
       const a = rnd() * Math.PI * 2;
       const b = (rnd() - 0.5) * Math.PI;
-      const dist = 40 + rnd() * 160;
+      const dist = 100 + rnd() * 420;
       cx = wx + Math.cos(a) * Math.cos(b) * dist;
       cy = Math.max(70, wy + Math.sin(b) * dist * 0.7);
       cz = wz + Math.sin(a) * Math.cos(b) * dist;
     } else {
       // loose scatter through the whole city cylinder
       const a = rnd() * Math.PI * 2;
-      const r = 60 + rnd() * 560;
+      const r = 150 + rnd() * 1400;
       cx = Math.cos(a) * r;
-      cy = 80 + rnd() * 870;
+      cy = 150 + rnd() * 2200;
       cz = Math.sin(a) * r;
     }
     const w = 2 + rnd() * 3;

@@ -27,13 +27,13 @@ export interface DragonDef {
 
 export const DRAGONS: DragonDef[] = [
   // circles RIGHT OVER the spawn temple — you see your first dragon in second one
-  { id: 0, name: 'BONE WYRM',   scale: 1,   hp: 420,  speed: 38, home: [0, 106, 0], circleR: 38, circleSpeed: 0.25, phase: 0.4 },
+  { id: 0, name: 'BONE WYRM',   scale: 3,   hp: 700,  speed: 70, home: [0, 170, 0], circleR: 95, circleSpeed: 0.2, phase: 0.4 },
   // circling a mid-city rooftop cluster
-  { id: 1, name: 'GLITCH DRAKE', scale: 1,  hp: 420,  speed: 38, home: [-280, 300, 210], circleR: 46, circleSpeed: 0.18, phase: 2.2 },
+  { id: 1, name: 'GLITCH DRAKE', scale: 3,  hp: 700,  speed: 70, home: [-700, 800, 530], circleR: 140, circleSpeed: 0.16, phase: 2.2 },
   // deep in the outer halo — the far hunter
-  { id: 2, name: 'VOID SERPENT', scale: 1.2, hp: 520, speed: 40, home: [260, 620, 260],  circleR: 60, circleSpeed: 0.15, phase: 4.1 },
+  { id: 2, name: 'VOID SERPENT', scale: 3.6, hp: 900, speed: 75, home: [650, 1400, 650], circleR: 190, circleSpeed: 0.13, phase: 4.1 },
   // THE APEX — huge, circling the black hole itself
-  { id: 3, name: 'MARKET MAKER', scale: 2.6, hp: 1400, speed: 48, home: [BLACK_HOLE.x, BLACK_HOLE.y + 80, BLACK_HOLE.z], circleR: 170, circleSpeed: 0.1, phase: 1.0 },
+  { id: 3, name: 'MARKET MAKER', scale: 8, hp: 3200, speed: 110, home: [BLACK_HOLE.x, BLACK_HOLE.y + 150, BLACK_HOLE.z], circleR: 1050, circleSpeed: 0.07, phase: 1.0 },
 ];
 
 /** Analytic wild patrol position + heading (pure f(t), deterministic). */

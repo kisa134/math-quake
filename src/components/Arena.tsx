@@ -65,13 +65,13 @@ export const Arena = () => {
       <group ref={skyRef}>
         <MatrixRain />
         <Stars radius={300} depth={100} count={10000} factor={4} saturation={1} fade speed={1.5} />
-        <Grid infiniteGrid fadeDistance={400} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
+        <Grid infiniteGrid fadeDistance={2000} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
       </group>
 
       {/* Massive Void Floor - basically a kill plane visual */}
       <RigidBody type="fixed">
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -50, 0]} receiveShadow userData={{ isFloor: true }}>
-          <planeGeometry args={[1000, 1000]} />
+          <planeGeometry args={[6000, 6000]} />
           <meshStandardMaterial color="#050510" roughness={0.9} metalness={0.1} />
         </mesh>
       </RigidBody>

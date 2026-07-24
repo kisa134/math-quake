@@ -39,17 +39,17 @@ export interface VoxData {
   neighborsOf: Map<number, number[]>;
 }
 
-export const VOX_SIZE = 0.8;
+export const VOX_SIZE = 2.2; // V6: свечи-гиганты
 export const COLLAPSE_AT = 0.25;
 
 /** The all-consuming donut; the universe wheels around it, looming over spawn. */
-export const BLACK_HOLE = { x: 0, y: 235, z: 0, ringR: 110, tubeR: 34 };
+export const BLACK_HOLE = { x: 0, y: 900, z: 0, ringR: 700, tubeR: 220 };
 
 export const voxInbox: { id: number; x: number; y: number; z: number; r: number }[] = [];
 
 // belt tables (spec §1/§2)
 const BELT_WAVE_AMP = [6, 9, 14];
-const BELT_MA_R = [120, 270, 470]; // MA-20 radius is animated by the conductor
+const BELT_MA_R = [500, 1075, 2000]; // MA-20 radius is animated by the conductor
 
 const mulberry32 = (seed: number) => {
   let a = seed >>> 0;
@@ -100,7 +100,7 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
       voxStart: start,
       voxCount: vox - start,
       orbitR: R,
-      angSpeed: (2.2 + rnd() * 3) / R, // flat rotation curve: 2.2–5.2 u/s everywhere
+      angSpeed: (8 + rnd() * 10) / R, // V6 flat curve: 8–18 u/s — движение видно на гига-масштабе
       incSin: Math.sin((rnd() - 0.5) * 1.2),
       incCos: Math.cos((rnd() - 0.5) * 1.2),
       belt,
@@ -110,9 +110,9 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
     });
   };
 
-  for (let i = 0; i < 74; i++) addCandle(0, 70, 170);
-  for (let i = 0; i < 68; i++) addCandle(1, 210, 330);
-  for (let i = 0; i < 38; i++) addCandle(2, 380, 560);
+  for (let i = 0; i < 74; i++) addCandle(0, 300, 700);
+  for (let i = 0; i < 68; i++) addCandle(1, 850, 1300);
+  for (let i = 0; i < 38; i++) addCandle(2, 1600, 2400);
 
   // patrons: every non-whale follows a whale of its own belt (кит ведёт шлейф)
   for (let belt = 0; belt < 3; belt++) {
@@ -194,7 +194,7 @@ export function candleLivePos(
     } else if (tau >= ev.dur + RESURRECT_DELAY) {
       // resurrection in the halo: liquidity is immortal, only traders die
       status = 3;
-      const newR = 400 + hash01(c.id, 13) * 140;
+      const newR = 1600 + hash01(c.id, 13) * 600;
       theta = hash01(c.id, 17) * Math.PI * 2 + tW * (3 / newR);
       r = newR;
       yWave = BELT_WAVE_AMP[2] * Math.sin(3 * theta - 0.35 * t);

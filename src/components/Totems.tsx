@@ -20,16 +20,16 @@ import { playExplosionSound } from '../utils/audio';
 export const totemHitInbox: { id: number; damage: number }[] = [];
 
 const TOTEM_DEFS = [
-  { asset: 'bitcoin', pos: [60, 46, -40] as const },
-  { asset: 'dollar', pos: [-70, 52, 55] as const },
-  { asset: 'gem', pos: [95, 70, 80] as const },
-  { asset: 'crown', pos: [-110, 88, -95] as const },
-  { asset: 'star', pos: [130, 60, -120] as const },
-  { asset: 'bitcoin', pos: [-150, 95, 130] as const },
-  { asset: 'dollar', pos: [170, 110, 40] as const },
-  { asset: 'gem', pos: [-60, 120, -160] as const },
-  { asset: 'crown', pos: [40, 140, 180] as const },
-  { asset: 'star', pos: [-180, 135, -40] as const },
+  { asset: 'bitcoin', pos: [180, 74, -120] as const },
+  { asset: 'dollar', pos: [-210, 83, 165] as const },
+  { asset: 'gem', pos: [285, 112, 240] as const },
+  { asset: 'crown', pos: [-330, 141, -285] as const },
+  { asset: 'star', pos: [390, 96, -360] as const },
+  { asset: 'bitcoin', pos: [-450, 152, 390] as const },
+  { asset: 'dollar', pos: [510, 176, 120] as const },
+  { asset: 'gem', pos: [-180, 192, -480] as const },
+  { asset: 'crown', pos: [120, 224, 540] as const },
+  { asset: 'star', pos: [-540, 216, -120] as const },
 ];
 const HP0 = 120;
 const RESPAWN_MS = 90000;

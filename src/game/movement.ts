@@ -34,19 +34,19 @@ export const MOVE = {
   bufferMs: 130,        // press-jump-slightly-early window (feels responsive)
 
   // --- safety ---
-  hardSpeedCap: 125,    // absolute horizontal speed clamp (raised for km-city flings)
+  hardSpeedCap: 220,  // V6: гига-масштаб = гига-скорости    // absolute horizontal speed clamp (raised for km-city flings)
 
   // --- jetpack (double-tap space) ---
-  jetThrust: 62,        // upward acceleration while thrusting (units/s^2)
-  jetMaxUp: 15,         // cap on upward velocity from the jetpack
+  jetThrust: 80,        // upward acceleration while thrusting (units/s^2)
+  jetMaxUp: 22,         // cap on upward velocity from the jetpack
   jetFuelMax: 100,
   jetDrain: 45,         // fuel per second while thrusting
   jetRegen: 24,         // fuel per second when grounded (×0.3 in the air)
   doubleTapMs: 300,     // window for the second Space tap to engage the pack
 
   // --- grappling hook (right mouse) — Spider-Man swing pass (V3.1) ---
-  grapplePull: 85,      // acceleration toward the anchor while reeling (harder yank)
-  grappleRange: 320,    // max latch distance — city-scale, skyscrapers in reach
+  grapplePull: 120,      // acceleration toward the anchor while reeling (harder yank)
+  grappleRange: 900,  // V6: полгорода в досягаемости    // max latch distance — city-scale, skyscrapers in reach
   grappleRelease: 4,    // auto-detach when this close to the anchor
   grappleReel: 26,      // rope shortens this fast while holding (units/s)
   grappleBoost: 1.14,   // velocity multiplier the instant you let go (the FLING)

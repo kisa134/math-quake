@@ -97,8 +97,8 @@ export const MatrixRain = () => {
   return (
     <>
       {/* FAR shell — monumental, slow, with aurora (reaches «infinity») */}
-      <mesh renderOrder={-11} position={[0, 700, 0]}>
-        <cylinderGeometry args={[1350, 1350, 3600, 72, 1, true]} />
+      <mesh renderOrder={-11} position={[0, 2500, 0]}>
+        <cylinderGeometry args={[5500, 5500, 14000, 72, 1, true]} />
         <shaderMaterial
           ref={farMat}
           vertexShader={vertexShader}
@@ -111,8 +111,8 @@ export const MatrixRain = () => {
         />
       </mesh>
       {/* NEAR shell — fine fast rain, parallax against the far wall */}
-      <mesh renderOrder={-10} position={[0, 500, 0]}>
-        <cylinderGeometry args={[900, 900, 2800, 64, 1, true]} />
+      <mesh renderOrder={-10} position={[0, 1600, 0]}>
+        <cylinderGeometry args={[3500, 3500, 9000, 64, 1, true]} />
         <shaderMaterial
           ref={nearMat}
           vertexShader={vertexShader}

@@ -13,9 +13,9 @@ import { tag } from '../game/hitTags';
  */
 const NO_RAYCAST = () => {};
 const SPOTS: { asset: string; pos: [number, number, number]; scale: number }[] = [
-  { asset: 'chrome1', pos: [45, 100, -38], scale: 5 },
-  { asset: 'chrome2', pos: [-58, 112, 42], scale: 5 },
-  { asset: 'chrome3', pos: [8, 130, 68], scale: 6 },
+  { asset: 'chrome1', pos: [95, 210, -80], scale: 11 },
+  { asset: 'chrome2', pos: [-120, 235, 88], scale: 11 },
+  { asset: 'chrome3', pos: [18, 270, 140], scale: 13 },
 ];
 
 export const ChromeIdols = () => {

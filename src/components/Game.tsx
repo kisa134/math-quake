@@ -131,11 +131,11 @@ export const Game = () => {
   return (
     <Canvas 
       shadows={false} 
-      camera={{ fov: 80, far: 2500 }}
+      camera={{ fov: 80, far: 9000 }}
       gl={{ powerPreference: "high-performance", antialias: false, stencil: false, depth: true }}
       dpr={[1, 1.5]}
     >
-      <fog attach="fog" args={[PALETTE.voidDeep, 200, 1800]} />
+      <fog attach="fog" args={[PALETTE.voidDeep, 600, 7000]} />
       <ChromeEnv />
       <AccentDriver />
       <Physics gravity={[0, -30, 0]}>
