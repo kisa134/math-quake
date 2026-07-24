@@ -12,10 +12,12 @@ import { tag } from '../game/hitTags';
  * proxies (raycast law: the 31k-tri meshes themselves go raycast-noop).
  */
 const NO_RAYCAST = () => {};
+// V6 Ш2: MONUMENT II — the Chrome Triptych carousel over the SW corner
+const CAROUSEL = { x: -120, y: 150, z: 120, r: 32 };
 const SPOTS: { asset: string; pos: [number, number, number]; scale: number }[] = [
-  { asset: 'chrome1', pos: [95, 210, -80], scale: 11 },
-  { asset: 'chrome2', pos: [-120, 235, 88], scale: 11 },
-  { asset: 'chrome3', pos: [18, 270, 140], scale: 13 },
+  { asset: 'chrome1', pos: [CAROUSEL.x + CAROUSEL.r, CAROUSEL.y, CAROUSEL.z], scale: 11 },
+  { asset: 'chrome2', pos: [CAROUSEL.x - CAROUSEL.r * 0.5, CAROUSEL.y, CAROUSEL.z + CAROUSEL.r * 0.87], scale: 11 },
+  { asset: 'chrome3', pos: [CAROUSEL.x - CAROUSEL.r * 0.5, CAROUSEL.y, CAROUSEL.z - CAROUSEL.r * 0.87], scale: 13 },
 ];
 
 export const ChromeIdols = () => {
@@ -27,8 +29,12 @@ export const ChromeIdols = () => {
     for (let i = 0; i < SPOTS.length; i++) {
       const g = groups.current[i];
       if (!g) continue;
-      g.rotation.y = t * (0.3 + i * 0.07);
-      g.position.y = SPOTS[i].pos[1] + Math.sin(t * 0.5 + i * 2.1) * 2.5;
+      // carousel: the triptych orbits its shared axis (MONUMENT II)
+      const a = t * 0.25 + (i / SPOTS.length) * Math.PI * 2;
+      g.position.x = CAROUSEL.x + Math.cos(a) * CAROUSEL.r;
+      g.position.z = CAROUSEL.z + Math.sin(a) * CAROUSEL.r;
+      g.rotation.y = t * 0.4 + i;
+      g.position.y = CAROUSEL.y + Math.sin(t * 0.5 + i * 2.1) * 4;
       if (!patched.current[i]) {
         let found = false;
         g.traverse((o) => {

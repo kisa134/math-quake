@@ -47,9 +47,10 @@ let _aliveCount = 0;
 export function spawnBotWave(count: number, round: number) { _spawn?.(count, round); }
 export function aliveBotCount() { return _aliveCount; }
 
+// V6 Ш2: орда лезет из ЖЕРЛА и с углов Торгового Пола
 const SPAWN_ANCHORS: [number, number, number][] = [
-  [0, 84, 0], [18, 86, 18], [-20, 86, 10], // V4.2: мясо приходит К ТЕБЕ на спавн-храм
-  [200, 24, 200], [-200, 24, 200], [200, 24, -200], [-200, 24, -200],
+  [0, 86, 0], [0, 86, 0], [0, 86, 0], // Жерло — главный поток
+  [100, 86, 100], [-100, 86, 100], [100, 86, -100], [-100, 86, -100],
 ];
 
 /** Write one bot's 6 part matrices + proxy + color. */

@@ -3,6 +3,7 @@ import { Physics } from '@react-three/rapier';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Arena } from './Arena';
+import { TradingFloor } from './TradingFloor';
 import { Cityscape } from './Cityscape';
 import { Player } from './Player';
 import { Enemies } from './Enemies';
@@ -149,6 +150,7 @@ export const Game = () => {
         />
 
         <Arena />
+        <TradingFloor />
         <Cityscape />
         <Dreamscape />
         <BlackHole />
