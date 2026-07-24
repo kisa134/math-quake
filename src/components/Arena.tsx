@@ -4,6 +4,7 @@ import { RigidBody } from '@react-three/rapier';
 import * as THREE from 'three';
 import { MatrixRain } from './MatrixRain';
 import { PALETTE } from '../theme';
+import { MATTE_WORLD, MATTE_WORLD_SOFT } from '../game/materials';
 
 /** Deterministic PRNG (mulberry32) — same seed → identical candlestick paths
  *  on every client (physics platforms MUST match across the network). */
@@ -137,29 +138,28 @@ const Candlestick = ({ position, height, width, isGreen }: { position: [number, 
   );
 }
 
-const Wall = ({ position, args, color = "#22223b" }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
+// V5.1 «трупный матовый»: ALL structural surfaces share ONE matte-black
+// glitter material (color prop kept for API compat, ignored by design).
+const Wall = ({ position, args }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
   <RigidBody type="fixed">
-    <mesh position={position} receiveShadow castShadow userData={{ isWall: true }}>
+    <mesh position={position} receiveShadow castShadow userData={{ isWall: true }} material={MATTE_WORLD_SOFT}>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} />
     </mesh>
   </RigidBody>
 );
 
-const Platform = ({ position, args, color = "#3a0ca3" }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
+const Platform = ({ position, args }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
   <RigidBody type="fixed">
-    <mesh position={position} receiveShadow castShadow userData={{ isFloor: true }}>
+    <mesh position={position} receiveShadow castShadow userData={{ isFloor: true }} material={MATTE_WORLD}>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} roughness={0.25} metalness={0.6} emissive={color} emissiveIntensity={0.5} toneMapped={false} />
     </mesh>
   </RigidBody>
 );
 
-const Pillar = ({ position, args, color = "#7209b7" }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
+const Pillar = ({ position, args }: { position: [number, number, number], args: [number, number, number], color?: string }) => (
   <RigidBody type="fixed">
-    <mesh position={position} receiveShadow castShadow userData={{ isWall: true }}>
+    <mesh position={position} receiveShadow castShadow userData={{ isWall: true }} material={MATTE_WORLD}>
       <boxGeometry args={args} />
-      <meshStandardMaterial color={color} roughness={0.3} metalness={0.7} emissive={color} emissiveIntensity={0.35} toneMapped={false} />
     </mesh>
   </RigidBody>
 );

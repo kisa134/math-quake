@@ -5,6 +5,7 @@ import { RigidBody } from '@react-three/rapier';
 import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
 import { accent } from '../game/accent';
+import { MATTE_INSTANCED, MATTE_WORLD } from '../game/materials';
 import { generateCity, type ClimbPiece, type Inst } from '../game/cityscape';
 
 /**
@@ -87,6 +88,17 @@ const ClimbBody = ({ p }: { p: ClimbPiece }) => {
     : tag({ isFloor: true, friction: p.friction, isMetal: p.isMetal });
   const ice = p.friction !== undefined;
   const metal = !!p.isMetal;
+  // V5.1: normal decks share the matte-black glitter world material; ice and
+  // metal keep their functional read (glassy / bronze).
+  if (!ice && !metal) {
+    return (
+      <RigidBody type="fixed">
+        <mesh position={p.pos} userData={ud} material={MATTE_WORLD}>
+          <boxGeometry args={p.size} />
+        </mesh>
+      </RigidBody>
+    );
+  }
   return (
     <RigidBody type="fixed">
       <mesh position={p.pos} userData={ud}>
@@ -94,9 +106,9 @@ const ClimbBody = ({ p }: { p: ClimbPiece }) => {
         <meshStandardMaterial
           color={p.color}
           emissive={p.color}
-          emissiveIntensity={ice ? 0.25 : metal ? 0.35 : 0.5}
-          roughness={ice ? 0.05 : metal ? 0.25 : 0.3}
-          metalness={ice ? 0.9 : metal ? 0.95 : 0.6}
+          emissiveIntensity={ice ? 0.25 : 0.35}
+          roughness={ice ? 0.05 : 0.25}
+          metalness={ice ? 0.9 : 0.95}
           toneMapped={false}
         />
       </mesh>
@@ -166,9 +178,8 @@ export const Cityscape = () => {
   return (
     <group>
       {/* --- skyline: 3 instanced draw calls total ------------------------ */}
-      <instancedMesh ref={towersRef} args={[undefined, undefined, city.towers.length]}>
+      <instancedMesh ref={towersRef} args={[undefined, undefined, city.towers.length]} material={MATTE_INSTANCED}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="#ffffff" roughness={0.85} metalness={0.35} />
       </instancedMesh>
       <instancedMesh ref={stripsRef} args={[undefined, undefined, city.strips.length]}>
         <boxGeometry args={[1, 1, 1]} />
