@@ -40,6 +40,7 @@ import { Ragdolls } from './Ragdolls';
 import { ShockRings } from './ShockRings';
 import { Euphoria } from './Euphoria';
 import { LowerSwarm } from './LowerSwarm';
+import { UpperSwarm } from './UpperSwarm';
 import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
@@ -173,6 +174,7 @@ export const Game = () => {
         <ShockRings />
         <Euphoria />
         <LowerSwarm />
+        <UpperSwarm />
         <PhysProps />
         <Totems />
         <ChromeIdols />
