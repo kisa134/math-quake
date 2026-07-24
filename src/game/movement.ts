@@ -44,10 +44,13 @@ export const MOVE = {
   jetRegen: 24,         // fuel per second when grounded (×0.3 in the air)
   doubleTapMs: 300,     // window for the second Space tap to engage the pack
 
-  // --- grappling hook (right mouse) ---
+  // --- grappling hook (right mouse) — Spider-Man swing pass (V3.1) ---
   grapplePull: 85,      // acceleration toward the anchor while reeling (harder yank)
-  grappleRange: 280,    // max latch distance — city-scale, skyscrapers in reach
+  grappleRange: 320,    // max latch distance — city-scale, skyscrapers in reach
   grappleRelease: 4,    // auto-detach when this close to the anchor
+  grappleReel: 26,      // rope shortens this fast while holding (units/s)
+  grappleBoost: 1.14,   // velocity multiplier the instant you let go (the FLING)
+  swingDamp: 0.92,      // how much of the outward radial velocity the rope kills
 };
 
 const UP = new THREE.Vector3(0, 1, 0);

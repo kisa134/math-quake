@@ -20,7 +20,7 @@ import { grappleCityHits } from './Cityscape';
 import { ECON } from '../config/economy';
 import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
-import { carveVoxCandle } from './VoxelCandles';
+import { carveVoxCandle, getVoxCandlePos, voxCandleAlive } from './VoxelCandles';
 
 const JUMP_FORCE = 15;
 
@@ -36,6 +36,18 @@ const _center2 = new THREE.Vector2(0, 0);
 const _grappleVec = new THREE.Vector3();
 const _ropeStart = new THREE.Vector3();
 const _camTarget = new THREE.Vector3();
+// Grapple 2.0 (Spider-Man pass): magnetic assist cone + swing temps
+const _velFull = new THREE.Vector3();
+const _candlePos = new THREE.Vector3();
+// NDC offsets tried in order — center first, then a widening assist cone.
+// «Цепляется всегда»: if the crosshair is даже рядом с целью — магнит доводит.
+const ASSIST_OFFSETS: [number, number][] = [
+  [0, 0],
+  [0.05, 0], [-0.05, 0], [0, 0.05], [0, -0.05],
+  [0.11, 0], [-0.11, 0], [0, 0.11], [0, -0.11],
+  [0.08, 0.08], [-0.08, 0.08], [0.08, -0.08], [-0.08, -0.08],
+];
+const _assistNdc = new THREE.Vector2();
 
 // WS-4 magnetic-boots probe (short lateral + up rays; reused each frame)
 const _bootRaycaster = new THREE.Raycaster();
@@ -97,11 +109,15 @@ export const Player = () => {
   const lastStunSeen = useRef(0);
   const lastFuelWrite = useRef(0);
 
-  // grappling hook (right mouse)
+  // grappling hook (right mouse) — Spider-Man swing state
   const grappleOn = useRef(false);
   const prevGrapple = useRef(false);
   const grappleAnchor = useRef(new THREE.Vector3());
   const grappleLineRef = useRef<THREE.Line>(null);
+  const ropeLen = useRef(0);
+  const grappleCandleId = useRef(-1); // >=0 → anchored to a MOVING voxel star
+  const grappleCandleOff = useRef(new THREE.Vector3());
+  const smoothFov = useRef(80);
 
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
@@ -265,13 +281,19 @@ export const Player = () => {
       camera.position.addScaledVector(_recoilVec, -recoilAmt.current * 0.5);
       camera.position.y += recoilAmt.current * 0.2;
       recoilAmt.current = Math.max(0, recoilAmt.current - delta * 9);
-      // AAA FOV punch: a few degrees of kick that springs back with the recoil.
+    }
+    // FOV = base + recoil punch + SPEED RUSH (the world widens as you fly —
+    // the core of the swing euphoria). Smoothed so it never snaps.
+    {
+      const spd = Math.hypot(velocity.x, velocity.z);
+      const speedFov = Math.min(11, Math.max(0, (spd - 26) * 0.18));
+      const target = 80 + recoilAmt.current * 5 + speedFov;
+      smoothFov.current += (target - smoothFov.current) * Math.min(1, delta * 7);
       const pc = camera as THREE.PerspectiveCamera;
-      pc.fov = 80 + recoilAmt.current * 5;
-      pc.updateProjectionMatrix();
-    } else {
-      const pc = camera as THREE.PerspectiveCamera;
-      if (pc.fov !== 80) { pc.fov = 80; pc.updateProjectionMatrix(); }
+      if (Math.abs(pc.fov - smoothFov.current) > 0.02) {
+        pc.fov = smoothFov.current;
+        pc.updateProjectionMatrix();
+      }
     }
 
     if (weaponRef.current) {
@@ -431,40 +453,59 @@ export const Player = () => {
 
     // --- Grappling hook (right mouse): latch a surface, then reel + swing ---
     if (editorMode) grappleOn.current = false; // RMB deletes props in build mode
+    // --- Grapple 2.0: magnetic assist cone — «цепляется всегда» -----------
     if (!editorMode && keys.grapple && !prevGrapple.current) {
-      raycaster.current.setFromCamera(_center2, camera);
-      raycaster.current.far = MOVE.grappleRange;
-      const hits = raycaster.current.intersectObjects(scene.children, true);
       let anchorDist = Infinity;
-      for (const h of hits) {
-        const ud = h.object.userData;
-        let o: THREE.Object3D | null = h.object;
-        let isEnemy = false;
-        while (o) { if (o.userData?.isEnemy) { isEnemy = true; break; } o = o.parent; }
-        if (ud?.isWall || ud?.isFloor || ud?.isJumpPad || ud?.isCreature || isEnemy) {
-          if (h.distance <= MOVE.grappleRange) {
+      grappleCandleId.current = -1;
+      for (const [ax, ay] of ASSIST_OFFSETS) {
+        _assistNdc.set(ax, ay);
+        raycaster.current.setFromCamera(_assistNdc, camera);
+        raycaster.current.far = MOVE.grappleRange;
+        const hits = raycaster.current.intersectObjects(scene.children, true);
+        for (const h of hits) {
+          const ud = h.object.userData;
+          let o: THREE.Object3D | null = h.object;
+          let isEnemy = false;
+          while (o) { if (o.userData?.isEnemy) { isEnemy = true; break; } o = o.parent; }
+          if (ud?.isWall || ud?.isFloor || ud?.isJumpPad || ud?.isCreature || isEnemy) {
             grappleAnchor.current.copy(h.point);
             anchorDist = h.distance;
+            // moving voxel star → remember id + local offset so the anchor RIDES it
+            if (ud?.isVoxCandle && getVoxCandlePos(+ud.id, _candlePos)) {
+              grappleCandleId.current = +ud.id;
+              grappleCandleOff.current.copy(h.point).sub(_candlePos);
+            }
+            break;
           }
+        }
+        if (anchorDist < Infinity) break; // first assist ray that latched wins
+        // skyscrapers are raycast-noop for probes — test them explicitly per ray
+        const cityHits = grappleCityHits(raycaster.current);
+        if (cityHits.length && cityHits[0].distance <= MOVE.grappleRange) {
+          grappleAnchor.current.copy(cityHits[0].point);
+          anchorDist = cityHits[0].distance;
           break;
         }
-      }
-      // Grapple ANYTHING: the instanced skyscrapers are raycast-noop for the
-      // per-frame probes, but a click may test them explicitly — closest wins.
-      const cityHits = grappleCityHits(raycaster.current);
-      if (cityHits.length && cityHits[0].distance <= MOVE.grappleRange && cityHits[0].distance < anchorDist) {
-        grappleAnchor.current.copy(cityHits[0].point);
-        anchorDist = cityHits[0].distance;
       }
       raycaster.current.far = Infinity;
       if (anchorDist < Infinity) {
         grappleOn.current = true;
+        ropeLen.current = anchorDist;
         playShootSound(150, 0.09);
       }
     }
     prevGrapple.current = keys.grapple;
 
+    // --- Grapple 2.0: pendulum swing + reel (the Spider-Man frame) --------
     if (grappleOn.current) {
+      // anchor rides a moving star (and lets go if the star died/fell)
+      if (grappleCandleId.current >= 0) {
+        if (voxCandleAlive(grappleCandleId.current) && getVoxCandlePos(grappleCandleId.current, _candlePos)) {
+          grappleAnchor.current.copy(_candlePos).add(grappleCandleOff.current);
+        } else {
+          grappleCandleId.current = -1; // star gone — keep the last point static
+        }
+      }
       _grappleVec.set(
         grappleAnchor.current.x - currentPos.x,
         grappleAnchor.current.y - (currentPos.y + 0.8),
@@ -472,13 +513,31 @@ export const Player = () => {
       );
       const dist = _grappleVec.length();
       if (!keys.grapple || dist < MOVE.grappleRelease) {
-        grappleOn.current = false; // release keeps momentum → satisfying fling
+        // release = the FLING: keep momentum + a boost, Spider-Man exit
+        grappleOn.current = false;
+        _moveVel.multiplyScalar(MOVE.grappleBoost);
+        newY *= MOVE.grappleBoost;
       } else {
         _grappleVec.multiplyScalar(1 / dist);
+        // steady pull (the original кайф — unchanged)
         const pull = MOVE.grapplePull * delta;
         _moveVel.x += _grappleVec.x * pull;
         _moveVel.z += _grappleVec.z * pull;
         newY += _grappleVec.y * pull;
+        // reel in while holding → rope shortens, arcs tighten
+        ropeLen.current = Math.max(5, ropeLen.current - MOVE.grappleReel * delta);
+        // pendulum constraint: outside the rope, the rope kills the OUTWARD
+        // radial velocity → energy converts into a swing arc instead of a stall
+        if (dist > ropeLen.current) {
+          _velFull.set(_moveVel.x, newY, _moveVel.z);
+          const vr = _velFull.dot(_grappleVec); // toward anchor = positive
+          if (vr < 0) {
+            _velFull.addScaledVector(_grappleVec, -vr * MOVE.swingDamp);
+            _moveVel.x = _velFull.x;
+            newY = _velFull.y;
+            _moveVel.z = _velFull.z;
+          }
+        }
       }
     }
 

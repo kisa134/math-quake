@@ -2,10 +2,9 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { RigidBody } from '@react-three/rapier';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
-import { generateCity, type CandleInst, type ClimbPiece, type Inst } from '../game/cityscape';
+import { generateCity, type ClimbPiece, type Inst } from '../game/cityscape';
 
 /**
  * WS-A — renders the seeded 1-km cyberpunk city from generateCity().
@@ -64,29 +63,9 @@ function useStaticInstances(list: Inst[], dynamic = false) {
   return ref;
 }
 
-/** Batch-drift one candle mesh: only the `slice` quarter updates this frame. */
-function driftCandles(mesh: THREE.InstancedMesh | null, list: CandleInst[], t: number, slice: number) {
-  if (!mesh) return;
-  for (let i = slice; i < list.length; i += 4) {
-    const c = list[i];
-    DUMMY.position.set(c.pos[0], c.pos[1] + Math.sin(t * c.speed + c.phase) * c.amp, c.pos[2]);
-    DUMMY.rotation.set(0, c.phase + t * c.speed * 0.2, 0);
-    DUMMY.scale.set(c.scale[0], c.scale[1], c.scale[2]);
-    DUMMY.updateMatrix();
-    mesh.setMatrixAt(i, DUMMY.matrix);
-  }
-  mesh.instanceMatrix.needsUpdate = true;
-}
-
-/** Candle body (unit box) + tall thin wick merged into ONE geometry → 1 draw. */
-function makeCandleGeometry(): THREE.BufferGeometry {
-  const body = new THREE.BoxGeometry(1, 1, 1);
-  const wick = new THREE.BoxGeometry(0.1, 1.7, 0.1);
-  const merged = mergeGeometries([body, wick]);
-  body.dispose();
-  wick.dispose();
-  return merged;
-}
+// NOTE (V3.1): the old decorative bull/bear candle swarms are GONE — every
+// candle in the sky is now a real voxel star orbiting the black hole
+// (VoxelCandles.tsx). Cheaper AND shootable.
 
 // ------------------------------------------------------- climb (physics) ----
 
@@ -128,14 +107,11 @@ const ClimbBody = ({ p }: { p: ClimbPiece }) => {
 
 export const Cityscape = () => {
   const city = useMemo(() => generateCity(), []);
-  const candleGeo = useMemo(() => makeCandleGeometry(), []);
 
   const towersRef = useStaticInstances(city.towers);
   useEffect(() => { _towersMesh = towersRef.current; return () => { _towersMesh = null; }; }, [towersRef]);
   const stripsRef = useStaticInstances(city.strips);
   const roofsRef = useStaticInstances(city.roofs);
-  const bullsRef = useStaticInstances(city.bulls, true);
-  const bearsRef = useStaticInstances(city.bears, true);
 
   const planetRefs = useRef<Array<THREE.Group | null>>([]);
   const planetPatched = useRef<boolean[]>([]);
@@ -150,15 +126,10 @@ export const Cityscape = () => {
     }
   }, [gl]);
 
-  // ONE batched useFrame: candle drift (1/4 per frame) + planet rotation.
+  // ONE batched useFrame: planet rotation (+ one-time raycast patch below).
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
-    // 8-frame cycle: even frames drift a quarter of the bulls, odd frames a
-    // quarter of the bears → each mesh re-uploads at most every other frame
-    // and every instance is touched once per 8 frames.
     frame.current = (frame.current + 1) % 8;
-    if (frame.current % 2 === 0) driftCandles(bullsRef.current, city.bulls, t, frame.current >> 1);
-    else driftCandles(bearsRef.current, city.bears, t, frame.current >> 1);
 
     for (let i = 0; i < city.planets.length; i++) {
       const g = planetRefs.current[i];
@@ -198,16 +169,6 @@ export const Cityscape = () => {
       <instancedMesh ref={roofsRef} args={[undefined, undefined, city.roofs.length]}>
         <boxGeometry args={[1, 1, 1]} />
         <meshBasicMaterial color="#ffffff" toneMapped={false} />
-      </instancedMesh>
-
-      {/* --- floating candle swarms: 2 instanced draw calls --------------- */}
-      <instancedMesh ref={bullsRef} args={[undefined, undefined, city.bulls.length]}>
-        <primitive object={candleGeo} attach="geometry" />
-        <meshBasicMaterial color="#b8f2d8" toneMapped={false} />
-      </instancedMesh>
-      <instancedMesh ref={bearsRef} args={[undefined, undefined, city.bears.length]}>
-        <primitive object={candleGeo} attach="geometry" />
-        <meshBasicMaterial color="#ffb3c1" toneMapped={false} />
       </instancedMesh>
 
       {/* --- playable climb skeleton (fixed RigidBodies) ------------------ */}

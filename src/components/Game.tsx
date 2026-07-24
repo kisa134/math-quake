@@ -16,6 +16,7 @@ import { Cars } from './Cars';
 import { Creatures } from './Creatures';
 import { VoxelCandles } from './VoxelCandles';
 import { Dreamscape } from './Dreamscape';
+import { BlackHole } from './BlackHole';
 import { Editor } from './Editor';
 import { PostFX } from './PostFX';
 import { useEffect, useRef } from 'react';
@@ -97,6 +98,7 @@ export const Game = () => {
         <Arena />
         <Cityscape />
         <Dreamscape />
+        <BlackHole />
         <VoxelCandles />
         <Player />
         <LocalMinions />

@@ -10,13 +10,31 @@ import type { DebrisChunk } from './voxel';
  */
 export interface VoxCandle {
   id: number;
-  pos: [number, number, number]; // base (bottom-center of body)
+  pos: [number, number, number]; // seed position (used as fallback)
   bull: boolean;
-  phase: number;  // drift phase
-  amp: number;    // bob amplitude
-  speed: number;  // bob speed
+  phase: number;  // orbit phase
+  amp: number;    // legacy bob amplitude (unused in orbit mode)
+  speed: number;  // legacy bob speed (unused in orbit mode)
   voxStart: number; // index of first voxel in the global arrays
   voxCount: number;
+  // V3.1 «вселенная»: every candle ORBITS the central black hole like a star.
+  orbitR: number;   // orbit radius from the black-hole axis
+  angSpeed: number; // rad/s (flat rotation curve: slower far out)
+  incSin: number;   // orbit-plane inclination (precomputed sin/cos)
+  incCos: number;
+}
+
+/** The all-consuming donut sits here; orbits center on it. */
+export const BLACK_HOLE = { x: 0, y: 300, z: 0, ringR: 110, tubeR: 34 };
+
+/** Analytic orbital base position of a candle at time t (zero-alloc via out). */
+export function candleBasePos(c: VoxCandle, t: number, out: { x: number; y: number; z: number }) {
+  const th = c.phase + t * c.angSpeed;
+  const x = Math.cos(th) * c.orbitR;
+  const z0 = Math.sin(th) * c.orbitR;
+  out.x = BLACK_HOLE.x + x;
+  out.y = BLACK_HOLE.y + z0 * c.incSin;
+  out.z = BLACK_HOLE.z + z0 * c.incCos;
 }
 
 export interface VoxData {
@@ -53,7 +71,7 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
   const shadeArr: number[] = [];
   let vox = 0;
 
-  const addCandle = (x: number, y: number, z: number) => {
+  const addCandle = (x: number, y: number, z: number, orbitR = 0) => {
     const bull = rnd() > 0.45;
     // chart-candle voxel layout: body 3×H×3 + top wick + bottom wick (1×n×1)
     const bodyH = 5 + Math.floor(rnd() * 4);      // 5..8
@@ -80,6 +98,7 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
       shadeArr.push(0.9 + rnd() * 0.25);
       vox++;
     }
+    const R = orbitR || 70 + rnd() * 450;
     candles.push({
       id: candles.length,
       pos: [x, y, z],
@@ -89,21 +108,20 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
       speed: 0.2 + rnd() * 0.5,
       voxStart: start,
       voxCount: vox - start,
+      // flat rotation curve: tangential speed ~2.2–5.2 u/s everywhere → calm
+      // starfield drift, ride-able with the grapple
+      orbitR: R,
+      angSpeed: (2.2 + rnd() * 3) / R,
+      incSin: Math.sin((rnd() - 0.5) * 1.2),
+      incCos: Math.cos((rnd() - 0.5) * 1.2),
     });
   };
 
-  // ring field around the arena — reachable by jumps/grapple
-  for (let i = 0; i < 34; i++) {
-    const a = rnd() * Math.PI * 2;
-    const r = 60 + rnd() * 170;
-    addCandle(Math.cos(a) * r, 26 + rnd() * 100, Math.sin(a) * r);
-  }
-  // sentinels along the climb (higher, sparser)
-  for (let i = 0; i < 10; i++) {
-    const a = rnd() * Math.PI * 2;
-    const r = 90 + rnd() * 140;
-    addCandle(Math.cos(a) * r, 140 + rnd() * 220, Math.sin(a) * r);
-  }
+  // «вселенная»: 90 star-candles orbiting the central black hole. Dense inner
+  // belt (reachable from the arena/towers), sparser far shells.
+  for (let i = 0; i < 46; i++) addCandle(0, 0, 0, 70 + rnd() * 160);   // inner belt
+  for (let i = 0; i < 30; i++) addCandle(0, 0, 0, 230 + rnd() * 170);  // mid shell
+  for (let i = 0; i < 14; i++) addCandle(0, 0, 0, 400 + rnd() * 140);  // outer halo
 
   return {
     candles,

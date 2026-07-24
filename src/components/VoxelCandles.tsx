@@ -5,86 +5,132 @@ import { useStore } from '../store';
 import { tag } from '../game/hitTags';
 import { socket } from '../socket';
 import { addTrauma } from '../game/shake';
-import { playImpactSound } from '../utils/audio';
+import { playImpactSound, playExplosionSound } from '../utils/audio';
 import {
   generateVoxCandles, voxDebris, voxInbox, VOX_SIZE, COLLAPSE_AT,
+  candleBasePos, type VoxCandle,
 } from '../game/voxCandles';
 
 /**
- * Teardown-style voxel trading candles (V2.1). ~44 candles ≈ 3k voxels drawn as
- * ONE InstancedMesh (per-voxel instanceColor, raycast=noop — the raycast law).
- * Each candle has an invisible box PROXY tagged {isWall,isVoxCandle,id}: the
- * probes/grapple/hitscan see only 44 cheap boxes. Shooting carves voxels in a
- * radius — they fly off through the existing Debris pool; below 25% alive the
- * whole candle bursts. Carves replicate via the 'vox' broadcast (voxInbox).
+ * V3.1 «Вселенная свечей»: ALL candles are Teardown-voxel STARS orbiting the
+ * central black-hole donut. ~90 candles ≈ 5.5k voxels in ONE InstancedMesh
+ * (raycast=noop); 90 invisible moving box proxies are the only ray targets
+ * (grapple-able — you can ride an orbiting star!). Shooting carves voxels;
+ * below 25% alive the candle STOPS orbiting and FALLS, tumbling, until it
+ * shatters on the void floor. Carves replicate via 'vox' (voxInbox).
+ *
+ * Perf: orbit matrices update round-robin (1/6 of candles per frame ≈ 900
+ * setMatrixAt); falling candles update every frame (few at a time).
  */
 const NO_RAYCAST = () => {};
 const DUMMY = new THREE.Object3D();
 const COLOR = new THREE.Color();
-const BULL = new THREE.Color('#00f5d4');
-const BEAR = new THREE.Color('#f72585');
+const BULL = new THREE.Color('#2fbf71');
+const BEAR = new THREE.Color('#c9184a');
 const ZERO_SCALE = new THREE.Matrix4().makeScale(0, 0, 0);
+const G = 26; // fall gravity for broken candles
 
-// module state so Player/Projectiles can carve without prop-drilling
+// ---- module state (grapple + carve API without prop drilling) --------------
 let _carve: ((id: number, x: number, y: number, z: number, r: number, broadcast: boolean) => void) | null = null;
+let _basePos: Float32Array | null = null;   // current base position per candle (xyz)
+let _aliveCount: Int32Array | null = null;
 
-/** Carve voxels near a world point (called from Player hitscan / Projectiles). */
 export function carveVoxCandle(id: number, x: number, y: number, z: number, r = 1.4, broadcast = true) {
   _carve?.(id, x, y, z, r, broadcast);
+}
+
+/** Current world base position of a candle (for grapple anchors on moving stars). */
+export function getVoxCandlePos(id: number, out: THREE.Vector3): boolean {
+  if (!_basePos || !_aliveCount || _aliveCount[id] <= 0) return false;
+  out.set(_basePos[id * 3], _basePos[id * 3 + 1], _basePos[id * 3 + 2]);
+  return true;
+}
+
+export function voxCandleAlive(id: number): boolean {
+  return !!_aliveCount && _aliveCount[id] > 0;
 }
 
 export const VoxelCandles = () => {
   const data = useMemo(() => generateVoxCandles(), []);
   const meshRef = useRef<THREE.InstancedMesh>(null);
+  const proxyRefs = useRef<Array<THREE.Mesh | null>>([]);
   const alive = useRef<Uint8Array>(new Uint8Array(data.total).fill(1));
   const aliveCount = useRef<Int32Array>(new Int32Array(data.candles.length));
-  const bobY = useRef<Float32Array>(new Float32Array(data.candles.length));
+  const basePos = useRef<Float32Array>(new Float32Array(data.candles.length * 3));
+  // falling state: -1 = orbiting; >=0 = current fall vy
+  const fallVy = useRef<Float32Array>(new Float32Array(data.candles.length).fill(-1));
+  const fallSpin = useRef<Float32Array>(new Float32Array(data.candles.length));
   const frame = useRef(0);
+  const timeRef = useRef(0);
 
-  // seed initial matrices + colors
+  const writeCandle = (c: VoxCandle, m: THREE.InstancedMesh, spin: number) => {
+    const bx = basePos.current[c.id * 3];
+    const by = basePos.current[c.id * 3 + 1];
+    const bz = basePos.current[c.id * 3 + 2];
+    for (let v = 0; v < c.voxCount; v++) {
+      const g = c.voxStart + v;
+      if (!alive.current[g]) continue;
+      DUMMY.position.set(
+        bx + data.local[g * 3],
+        by + data.local[g * 3 + 1],
+        bz + data.local[g * 3 + 2],
+      );
+      DUMMY.rotation.set(spin, spin * 0.7, 0);
+      DUMMY.scale.setScalar(VOX_SIZE * 0.96);
+      DUMMY.updateMatrix();
+      m.setMatrixAt(g, DUMMY.matrix);
+    }
+    const proxy = proxyRefs.current[c.id];
+    if (proxy) proxy.position.set(bx, by + (c.voxCount / 11) * VOX_SIZE * 0.5, bz);
+  };
+
+  // seed matrices + colors + module registries
   useLayoutEffect(() => {
     const m = meshRef.current;
     if (!m) return;
     m.raycast = NO_RAYCAST;
     m.frustumCulled = false;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    const posTmp = { x: 0, y: 0, z: 0 };
     for (const c of data.candles) {
       aliveCount.current[c.id] = c.voxCount;
+      candleBasePos(c, 0, posTmp);
+      basePos.current[c.id * 3] = posTmp.x;
+      basePos.current[c.id * 3 + 1] = posTmp.y;
+      basePos.current[c.id * 3 + 2] = posTmp.z;
+      writeCandle(c, m, 0);
       for (let v = 0; v < c.voxCount; v++) {
         const g = c.voxStart + v;
-        DUMMY.position.set(
-          c.pos[0] + data.local[g * 3],
-          c.pos[1] + data.local[g * 3 + 1],
-          c.pos[2] + data.local[g * 3 + 2],
-        );
-        DUMMY.rotation.set(0, 0, 0);
-        DUMMY.scale.setScalar(VOX_SIZE * 0.96);
-        DUMMY.updateMatrix();
-        m.setMatrixAt(g, DUMMY.matrix);
         COLOR.copy(c.bull ? BULL : BEAR).multiplyScalar(data.shade[g]);
         m.setColorAt(g, COLOR);
       }
     }
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    _basePos = basePos.current;
+    _aliveCount = aliveCount.current;
+    return () => { _basePos = null; _aliveCount = null; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
 
-  // the carve implementation (registered module-wide)
+  // carve implementation
   useLayoutEffect(() => {
     _carve = (id, x, y, z, r, broadcast) => {
       const m = meshRef.current;
       const c = data.candles[id];
       if (!m || !c || aliveCount.current[id] <= 0) return;
       const r2 = r * r;
-      const by = bobY.current[id];
+      const bx = basePos.current[id * 3];
+      const by = basePos.current[id * 3 + 1];
+      const bz = basePos.current[id * 3 + 2];
       const chunks: ReturnType<typeof voxDebris>[] = [];
-      const colorHex = c.bull ? '#00f5d4' : '#f72585';
+      const colorHex = c.bull ? '#2fbf71' : '#c9184a';
       for (let v = 0; v < c.voxCount; v++) {
         const g = c.voxStart + v;
         if (!alive.current[g]) continue;
-        const wx = c.pos[0] + data.local[g * 3];
-        const wy = c.pos[1] + data.local[g * 3 + 1] + by;
-        const wz = c.pos[2] + data.local[g * 3 + 2];
+        const wx = bx + data.local[g * 3];
+        const wy = by + data.local[g * 3 + 1];
+        const wz = bz + data.local[g * 3 + 2];
         const dx = wx - x, dy = wy - y, dz = wz - z;
         if (dx * dx + dy * dy + dz * dz <= r2) {
           alive.current[g] = 0;
@@ -94,20 +140,14 @@ export const VoxelCandles = () => {
         }
       }
       if (!chunks.length) return;
-      // collapse: too little left → burst everything remaining
-      if (aliveCount.current[id] > 0 && aliveCount.current[id] < c.voxCount * COLLAPSE_AT) {
-        for (let v = 0; v < c.voxCount; v++) {
-          const g = c.voxStart + v;
-          if (!alive.current[g]) continue;
-          alive.current[g] = 0;
-          const wx = c.pos[0] + data.local[g * 3];
-          const wy = c.pos[1] + data.local[g * 3 + 1] + by;
-          const wz = c.pos[2] + data.local[g * 3 + 2];
-          m.setMatrixAt(g, ZERO_SCALE);
-          if (chunks.length < 30) chunks.push(voxDebris(wx, wy, wz, x, y, z, colorHex));
-        }
-        aliveCount.current[id] = 0;
-        addTrauma(0.18);
+      // Broken past the threshold → the star STOPS orbiting and FALLS.
+      if (
+        fallVy.current[id] < 0 &&
+        aliveCount.current[id] > 0 &&
+        aliveCount.current[id] < c.voxCount * COLLAPSE_AT
+      ) {
+        fallVy.current[id] = 0.01;
+        addTrauma(0.1);
       } else {
         addTrauma(0.05);
       }
@@ -119,8 +159,31 @@ export const VoxelCandles = () => {
     return () => { _carve = null; };
   }, [data]);
 
-  // drift (round-robin 1/6 of candles per frame) + drain remote carves
-  useFrame((state) => {
+  // shatter a falling candle on the floor: burst every remaining voxel
+  const shatter = (c: VoxCandle, m: THREE.InstancedMesh) => {
+    const bx = basePos.current[c.id * 3];
+    const by = basePos.current[c.id * 3 + 1];
+    const bz = basePos.current[c.id * 3 + 2];
+    const chunks: ReturnType<typeof voxDebris>[] = [];
+    const colorHex = c.bull ? '#2fbf71' : '#c9184a';
+    for (let v = 0; v < c.voxCount; v++) {
+      const g = c.voxStart + v;
+      if (!alive.current[g]) continue;
+      alive.current[g] = 0;
+      const wx = bx + data.local[g * 3];
+      const wy = by + data.local[g * 3 + 1];
+      const wz = bz + data.local[g * 3 + 2];
+      m.setMatrixAt(g, ZERO_SCALE);
+      if (chunks.length < 30) chunks.push(voxDebris(wx, wy, wz, bx, by - 3, bz, colorHex));
+    }
+    aliveCount.current[c.id] = 0;
+    m.instanceMatrix.needsUpdate = true;
+    if (chunks.length) useStore.getState().addDebris(chunks);
+    addTrauma(0.2);
+    playExplosionSound();
+  };
+
+  useFrame((state, dt) => {
     const m = meshRef.current;
     if (!m) return;
     while (voxInbox.length) {
@@ -128,26 +191,30 @@ export const VoxelCandles = () => {
       _carve?.(e.id, e.x, e.y, e.z, e.r, false);
     }
     const t = state.clock.elapsedTime;
+    timeRef.current = t;
     frame.current = (frame.current + 1) % 6;
     let touched = false;
-    for (let ci = frame.current; ci < data.candles.length; ci += 6) {
+    const posTmp = { x: 0, y: 0, z: 0 };
+
+    for (let ci = 0; ci < data.candles.length; ci++) {
       const c = data.candles[ci];
       if (aliveCount.current[ci] <= 0) continue;
-      const by = Math.sin(t * c.speed + c.phase) * c.amp;
-      bobY.current[ci] = by;
-      for (let v = 0; v < c.voxCount; v++) {
-        const g = c.voxStart + v;
-        if (!alive.current[g]) continue;
-        DUMMY.position.set(
-          c.pos[0] + data.local[g * 3],
-          c.pos[1] + data.local[g * 3 + 1] + by,
-          c.pos[2] + data.local[g * 3 + 2],
-        );
-        DUMMY.rotation.set(0, 0, 0);
-        DUMMY.scale.setScalar(VOX_SIZE * 0.96);
-        DUMMY.updateMatrix();
-        m.setMatrixAt(g, DUMMY.matrix);
+      const falling = fallVy.current[ci] >= 0;
+      // orbiting candles update round-robin; FALLING ones update every frame
+      if (!falling && ci % 6 !== frame.current) continue;
+
+      if (falling) {
+        fallVy.current[ci] += G * dt;
+        basePos.current[ci * 3 + 1] -= fallVy.current[ci] * dt;
+        fallSpin.current[ci] += dt * 2.4;
+        if (basePos.current[ci * 3 + 1] < -46) { shatter(c, m); touched = true; continue; }
+      } else {
+        candleBasePos(c, t, posTmp);
+        basePos.current[ci * 3] = posTmp.x;
+        basePos.current[ci * 3 + 1] = posTmp.y;
+        basePos.current[ci * 3 + 2] = posTmp.z;
       }
+      writeCandle(c, m, falling ? fallSpin.current[ci] : 0);
       touched = true;
     }
     if (touched) m.instanceMatrix.needsUpdate = true;
@@ -159,15 +226,15 @@ export const VoxelCandles = () => {
         <boxGeometry args={[1, 1, 1]} />
         <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.55} toneMapped={false} roughness={0.35} metalness={0.4} />
       </instancedMesh>
-      {/* invisible per-candle proxies: the ONLY raycast targets (grapple-able) */}
+      {/* invisible MOVING per-candle proxies: the ONLY raycast targets (grapple-able stars) */}
       {data.candles.map((c) => (
         <mesh
           key={c.id}
+          ref={(el) => { proxyRefs.current[c.id] = el; }}
           visible={false}
-          position={[c.pos[0], c.pos[1] + (c.voxCount / 11) * VOX_SIZE * 0.5, c.pos[2]]}
           userData={tag({ isWall: true, isVoxCandle: true, id: String(c.id) })}
         >
-          <boxGeometry args={[3.4 * VOX_SIZE, (c.voxCount / 9 + 6) * VOX_SIZE + 5, 3.4 * VOX_SIZE]} />
+          <boxGeometry args={[3.6 * VOX_SIZE, (c.voxCount / 9 + 6) * VOX_SIZE, 3.6 * VOX_SIZE]} />
         </mesh>
       ))}
     </group>
