@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import * as THREE from 'three';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
-import { WEAPONS } from '../config/weapons';
+import { WEAPONS, type WeaponSpec } from '../config/weapons';
 import { weaponTune } from '../game/weaponTune';
 import { onFire } from '../game/fx';
+import { buildVoxGun, type VoxGunKind } from '../game/voxGuns';
+import { accent } from '../game/accent';
+import { gunState } from '../game/gunState';
 
 /**
  * First-person 3D weapon viewmodel — V2.
@@ -23,6 +26,80 @@ import { onFire } from '../game/fx';
  */
 export const WeaponModel = ({ weapon }: { weapon: number }) => {
   const spec = WEAPONS[weapon] ?? WEAPONS[0];
+  // V6 Ш3: shooting irons are procedural VOXEL GUNS; only magic keeps its FBX.
+  if (spec.voxel) return <VoxWeapon weapon={weapon} spec={spec} />;
+  return <FbxWeapon weapon={weapon} spec={spec} />;
+};
+
+// ── V6 Ш3: the voxel gun — black matte + market-accent glow + moving parts ──
+const GUN_BODY_MAT = new THREE.MeshStandardMaterial({
+  color: '#0f0e0d', roughness: 0.55, metalness: 0.55,
+});
+const GUN_GLOW_MAT = new THREE.MeshStandardMaterial({
+  color: '#c8b273', emissive: '#c8b273', emissiveIntensity: 1.4, toneMapped: false,
+});
+const GUN_MOVE_MAT = new THREE.MeshStandardMaterial({
+  color: '#1b1918', roughness: 0.45, metalness: 0.7,
+});
+
+const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
+  const build = useMemo(() => buildVoxGun(spec.voxel as VoxGunKind), [spec.voxel]);
+  const ref = useRef<THREE.Group>(null);
+  const movingRef = useRef<THREE.Mesh>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
+  const punch = useRef(0);
+  const clock = useRef(0);
+  const spin = useRef(0);
+
+  useEffect(() => onFire((recoil) => { punch.current = Math.min(1.4, punch.current + recoil); }), []);
+
+  useFrame((_, delta) => {
+    clock.current += delta;
+    const t = weaponTune[weapon];
+    const g = ref.current;
+    if (t && g) {
+      const p = punch.current;
+      const arc = Math.sin(Math.min(1, p) * Math.PI);
+      const bobY = Math.sin(clock.current * 1.6) * 0.006;
+      const bobX = Math.cos(clock.current * 1.1) * 0.004;
+      g.position.set(t.pos[0] + bobX, t.pos[1] + bobY + p * 0.03, t.pos[2] + p * 0.14);
+      g.rotation.set(t.rot[0] - p * 0.3, t.rot[1], t.rot[2] + p * 0.05);
+      g.scale.setScalar(spec.vLen * t.scale);
+
+      // moving part: bolt kicks back / pump racks / minigun barrels spin
+      const mv = movingRef.current;
+      if (mv && build.moving) {
+        if (build.moving.kind === 'bolt') mv.position.z = p * 0.11;
+        else if (build.moving.kind === 'pump') mv.position.z = arc * 0.16;
+        else if (build.moving.kind === 'barrels') {
+          spin.current += delta * (2 + gunState.heat * 42); // тртртр раскрутка
+          mv.rotation.z = spin.current;
+        }
+      }
+      GUN_GLOW_MAT.color.copy(accent);
+      GUN_GLOW_MAT.emissive.copy(accent);
+      const light = lightRef.current;
+      if (light) {
+        light.color.copy(accent);
+        light.intensity = 2.2 * (1 + 0.08 * Math.sin(clock.current * 3)) + p * 2.4;
+      }
+    }
+    punch.current = Math.max(0, punch.current - delta * 11);
+  });
+
+  return (
+    <group ref={ref}>
+      <mesh geometry={build.body} material={GUN_BODY_MAT} />
+      <mesh geometry={build.glow} material={GUN_GLOW_MAT} />
+      {build.moving && (
+        <mesh ref={movingRef} geometry={build.moving.geo} material={GUN_MOVE_MAT} position={build.moving.pos} />
+      )}
+      <pointLight ref={lightRef} intensity={2.2} distance={4} decay={2} position={[0, 0.06, -0.12]} />
+    </group>
+  );
+};
+
+const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
   const url = `${import.meta.env.BASE_URL}${spec.model}`;
   const fbx = useLoader(FBXLoader, url);
 

@@ -6,4 +6,5 @@
 export const gunState = {
   speed: 0,      // horizontal player speed (u/s)
   spread: 0,     // 0..1 current inaccuracy (spray index + minigun heat)
+  heat: 0,       // minigun spin-up 0..1 (VoxWeapon barrels read this)
 };

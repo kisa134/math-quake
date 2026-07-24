@@ -412,6 +412,7 @@ export const Player = () => {
       // V5 C1: feed the CS crosshair (gap breathes with run + spray + heat)
       gunState.speed = spd;
       gunState.spread = Math.min(1, sprayIdx.current * 0.09 + heatRef.current * 0.6);
+      gunState.heat = heatRef.current;
       const speedFov = Math.min(11, Math.max(0, (spd - 26) * 0.18));
       const target = 80 + recoilAmt.current * 5 + speedFov;
       smoothFov.current += (target - smoothFov.current) * Math.min(1, delta * 7);
