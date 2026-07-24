@@ -3,6 +3,7 @@ import { useStore } from './store';
 import { SUPABASE_URL, SUPABASE_ANON } from './net/supabaseConfig';
 import { creatureHitInbox } from './game/creatureNet';
 import { voxInbox } from './game/voxCandles';
+import { roundWinReward } from './config/economy';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -95,6 +96,20 @@ export const initMultiplayer = (roomId: string) => {
     // Only the host applies damage to the shared enemies.
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
+    }
+  });
+
+  // --- CS match rounds (V2.2): host drives, peers mirror + self-pay bonuses ---
+  channel.on('broadcast', { event: 'round' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (!useStore.getState().isHost) {
+      useStore.getState().setRound({ num: payload.num, phase: payload.phase, until: payload.until });
+    }
+  });
+  channel.on('broadcast', { event: 'roundwin' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (!useStore.getState().isHost) {
+      useStore.getState().addMoney(roundWinReward(payload.num));
     }
   });
 

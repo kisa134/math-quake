@@ -9,9 +9,10 @@ import { getAsset } from '../config/assets';
 import { WeaponHUD } from './WeaponHUD';
 import { SpellWheel } from './SpellWheel';
 import { AvatarPicker } from './AvatarPicker';
+import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
-  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody } = useStore();
+  const { score, health, isPlaying, roomId, setRoomId, startGame, currentWeapon, jetpackFuel, editorMode, editorSelect, editorScale, editorBody, money, round } = useStore();
   const [locked, setLocked] = useState(false);
 
   const weaponName = weaponNameOf(currentWeapon);
@@ -53,9 +54,9 @@ export const UI = () => {
               </div>
             </div>
             <div className="text-right">
-              <span className="text-emerald-500 font-black text-xs tracking-[0.3em] uppercase mb-1">Uptime / Sync</span>
-              <div className="text-4xl font-mono font-bold tabular-nums">12:44.<span className="text-xl opacity-50">02</span></div>
-              <div className="text-[10px] opacity-40 uppercase tracking-widest mt-1">Fractal Sync Stable</div>
+              <span className="text-emerald-500 font-black text-xs tracking-[0.3em] uppercase mb-1">Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
+              <div className="text-4xl font-mono font-bold tabular-nums text-emerald-300">${money}</div>
+              <div className="text-[10px] opacity-40 uppercase tracking-widest mt-1">Damage pays · rounds pay more</div>
             </div>
           </div>
 
@@ -63,6 +64,7 @@ export const UI = () => {
 
           <Hitmarker />
           <SpellWheel />
+          <BuyMenu />
 
           {!editorMode && <WeaponHUD />}
 

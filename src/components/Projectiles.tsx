@@ -8,6 +8,7 @@ import { getSpell } from '../config/spells';
 import { makeFlames } from '../game/voxel';
 import type { DebrisChunk } from '../game/voxel';
 import { carveVoxCandle } from './VoxelCandles';
+import { ECON } from '../config/economy';
 
 /**
  * Projectile behaviors — V2: сложносочинённая magic (multi-stage, layered).
@@ -266,6 +267,7 @@ const Projectile = ({ id, position, velocity, fromPlayer, createdAt, kind, color
                   socket.emit('ehit', { id: eid, damage: dmg, point: pt });
                 }
               }
+              useStore.getState().addMoney(dmg * ECON.moneyPerDamage); // CS economy
               hitEnemy = true;
               break;
             }

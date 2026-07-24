@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import * as THREE from 'three';
 import { addTrauma } from './game/shake';
 import { type DebrisChunk, DEBRIS_CAP, makeChunks } from './game/voxel';
+import { WEAPON_PRICES, ECON } from './config/economy';
 
 interface Enemy {
   id: string;
@@ -101,6 +102,11 @@ interface GameState {
   avatarId: string;
   // Vehicles (V2 WS-B): id of the car being driven, or null on foot
   driving: string | null;
+  // CS economy + match (V2.2)
+  money: number;
+  ownedWeapons: boolean[];   // by WEAPONS index; free loadout owned from start
+  buyMenuOpen: boolean;
+  round: { num: number; phase: 'buy' | 'wave'; until: number }; // until = Date.now() ms deadline (buy phase)
   // Neutral creatures (V2 WS-E): host sims `creatures`, peers mirror `netCreatures`
   creatures: Creature[];
   netCreatures: Creature[];
@@ -145,6 +151,10 @@ interface GameState {
   setSpellWheel: (open: boolean) => void;
   setAvatar: (id: string) => void;
   setDriving: (id: string | null) => void;
+  addMoney: (n: number) => void;
+  buyWeapon: (index: number) => void;
+  setBuyMenu: (open: boolean) => void;
+  setRound: (r: { num: number; phase: 'buy' | 'wave'; until: number }) => void;
   setCreatures: (c: Creature[]) => void;
   setNetCreatures: (c: Creature[]) => void;
   removeCreature: (id: string) => void;
@@ -178,6 +188,10 @@ export const useStore = create<GameState>((set) => ({
   spellWheelOpen: false,
   avatarId: 'skull',
   driving: null,
+  money: ECON.startMoney,
+  ownedWeapons: WEAPON_PRICES.map((p) => p === 0), // free loadout: wand + dagger
+  buyMenuOpen: false,
+  round: { num: 1, phase: 'buy', until: 0 },
   creatures: [],
   netCreatures: [],
   isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts
@@ -340,6 +354,16 @@ export const useStore = create<GameState>((set) => ({
   setSpellWheel: (open) => set({ spellWheelOpen: open }),
   setAvatar: (id) => set({ avatarId: id }),
   setDriving: (id) => set({ driving: id }),
+  addMoney: (n) => set((s) => ({ money: Math.min(ECON.maxMoney, Math.max(0, s.money + n)) })),
+  buyWeapon: (index) => set((s) => {
+    const price = WEAPON_PRICES[index];
+    if (price === undefined || s.ownedWeapons[index] || s.money < price) return s;
+    const owned = [...s.ownedWeapons];
+    owned[index] = true;
+    return { ownedWeapons: owned, money: s.money - price, currentWeapon: index };
+  }),
+  setBuyMenu: (open) => set({ buyMenuOpen: open }),
+  setRound: (r) => set({ round: r }),
   setCreatures: (c) => set({ creatures: c }),
   setNetCreatures: (c) => set({ netCreatures: c }),
   removeCreature: (id) => set((s) => ({ creatures: s.creatures.filter((c) => c.id !== id) })),

@@ -17,21 +17,59 @@ import { Creatures } from './Creatures';
 import { VoxelCandles } from './VoxelCandles';
 import { Editor } from './Editor';
 import { PostFX } from './PostFX';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useStore } from '../store';
 import { PALETTE } from '../theme';
+import { socket } from '../socket';
+import { MATCH, wavesSize, roundWinReward } from '../config/economy';
 
+/**
+ * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
+ * → WAVE (host staggers in a scaled pack of bots) → all dead = round WON →
+ * everyone gets the win bonus → next BUY. Peers mirror phase via 'round' and
+ * pay themselves the bonus on 'roundwin' (money is client-local like HP).
+ */
 const GameManager = () => {
-  const { isPlaying, isHost, spawnEnemy } = useStore();
+  const { isPlaying, isHost } = useStore();
+  const spawnLeft = useRef(0);
+  const lastSpawn = useRef(0);
 
   useEffect(() => {
-    // Only the host spawns/owns the shared enemies (non-hosts mirror them).
     if (!isPlaying || !isHost) return;
 
-    for (let i = 0; i < 5; i++) spawnEnemy();
-    const interval = setInterval(() => spawnEnemy(), 1800);
-    return () => clearInterval(interval);
-  }, [isPlaying, isHost, spawnEnemy]);
+    const startBuy = (num: number) => {
+      const r = { num, phase: 'buy' as const, until: Date.now() + MATCH.buySeconds * 1000 };
+      useStore.getState().setRound(r);
+      socket.emit('round', r);
+      spawnLeft.current = wavesSize(num);
+    };
+    startBuy(Math.max(1, useStore.getState().round.num));
+
+    const iv = setInterval(() => {
+      const st = useStore.getState();
+      const r = st.round;
+      const now = Date.now();
+      if (r.phase === 'buy') {
+        if (now >= r.until) {
+          const nr = { num: r.num, phase: 'wave' as const, until: 0 };
+          st.setRound(nr);
+          socket.emit('round', nr);
+        }
+      } else {
+        if (spawnLeft.current > 0 && now - lastSpawn.current > MATCH.spawnGapMs) {
+          lastSpawn.current = now;
+          st.spawnEnemy();
+          spawnLeft.current--;
+        }
+        if (spawnLeft.current === 0 && st.enemies.length === 0) {
+          st.addMoney(roundWinReward(r.num));
+          socket.emit('roundwin', { num: r.num });
+          startBuy(r.num + 1);
+        }
+      }
+    }, 400);
+    return () => clearInterval(iv);
+  }, [isPlaying, isHost]);
 
   return null;
 };

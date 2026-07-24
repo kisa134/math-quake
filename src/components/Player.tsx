@@ -17,6 +17,7 @@ import { CharacterModel } from './CharacterModel';
 import { trainVelocity } from './Train';
 import { carPositions, tryToggleCar } from './Cars';
 import { grappleCityHits } from './Cityscape';
+import { ECON } from '../config/economy';
 import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
 import { carveVoxCandle } from './VoxelCandles';
@@ -112,6 +113,7 @@ export const Player = () => {
       if (!isPlaying) return;
       const st = useStore.getState();
       if (e.code === 'KeyE') { if (!e.repeat) st.setSpellWheel(true); return; } // hold E → spell wheel
+      if (e.code === 'KeyP') { st.setBuyMenu(!st.buyMenuOpen); return; }        // CS buy menu
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
@@ -142,10 +144,18 @@ export const Player = () => {
         // Digits jump to an asset by index; scroll cycles (Editor.tsx owns it).
         const m = e.code.match(/^Digit([1-9])$/);
         if (m) { const i = +m[1] - 1; if (i < BUILD_IDS.length) st.setEditorSelect(BUILD_IDS[i]); }
+      } else if (st.buyMenuOpen) {
+        // Buy menu open: digits BUY (or equip if already owned).
+        const m = e.code.match(/^Digit([1-5])$/);
+        if (m) {
+          const i = +m[1] - 1;
+          if (st.ownedWeapons[i]) setWeapon(i);
+          else st.buyWeapon(i);
+        }
       } else if (!st.spellWheelOpen) {
         // While the spell wheel is open, digits pick spell slices (SpellWheel owns that).
         const m = e.code.match(/^Digit([1-9])$/);
-        if (m) setWeapon(+m[1] - 1); // 1-9 reaches the first nine; wheel covers the rest
+        if (m) { const i = +m[1] - 1; if (st.ownedWeapons[i]) setWeapon(i); } // only weapons you BOUGHT
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -156,10 +166,15 @@ export const Player = () => {
     const handleWheel = (e: WheelEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
-      if (st.editorMode || st.spellWheelOpen) return;
+      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen) return;
       const n = WEAPONS.length;
       const dir = e.deltaY > 0 ? 1 : -1;
-      st.setWeapon((st.currentWeapon + dir + n) % n);
+      // cycle to the next OWNED weapon (you only carry what you bought)
+      let i = st.currentWeapon;
+      for (let step = 0; step < n; step++) {
+        i = (i + dir + n) % n;
+        if (st.ownedWeapons[i]) { st.setWeapon(i); break; }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -529,7 +544,7 @@ export const Player = () => {
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
     const fireGate = Math.max(config.rate, spell.cooldown ?? 0);
-    if (!editorMode && keys.shoot && !useStore.getState().spellWheelOpen && now - lastShootTime > fireGate) {
+    if (!editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && now - lastShootTime > fireGate) {
       setLastShootTime(now);
       playShootSound(config.sound, 0.05);
       fireShot(config.recoil); // crosshair bloom + viewmodel punch
@@ -567,6 +582,7 @@ export const Player = () => {
             while (obj) {
               if (obj.userData?.isCreature) {
                 damageCreature(obj.userData.id, spell.damage);
+                useStore.getState().addMoney(spell.damage * ECON.moneyPerDamage);
                 anyHit = true; isHit = true; break;
               }
               if (obj.userData?.isEnemy) {
@@ -577,6 +593,7 @@ export const Player = () => {
                   useStore.getState().damageEnemy(eid, spell.damage, pt);
                   if (!useStore.getState().enemies.some((en) => en.id === eid)) anyKill = true;
                 } else socket.emit('ehit', { id: eid, damage: spell.damage, point: pt });
+                useStore.getState().addMoney(spell.damage * ECON.moneyPerDamage);
                 anyHit = true; isHit = true; break;
               }
               obj = obj.parent;
@@ -599,7 +616,11 @@ export const Player = () => {
             positions[3] = _endPoint.x; positions[4] = _endPoint.y; positions[5] = _endPoint.z;
             laserRef.current.geometry.attributes.position.needsUpdate = true;
           }
-          if (anyHit) { fireHitmarker(anyKill); if (anyKill) playExplosionSound(); else playHitTick(); }
+          if (anyHit) {
+            fireHitmarker(anyKill);
+            if (anyKill) { playExplosionSound(); useStore.getState().addMoney(ECON.killBonus); }
+            else playHitTick();
+          }
         } else if (spell.kind === 'nova') {
           const count = spell.novaCount ?? 12;
           const half = (spell.novaSpread ?? Math.PI) * 0.5;
@@ -670,6 +691,7 @@ export const Player = () => {
             while (obj) {
               if (obj.userData?.isCreature) {
                 damageCreature(obj.userData.id, config.damage);
+                useStore.getState().addMoney(config.damage * ECON.moneyPerDamage);
                 anyEnemyHit = true; isHit = true; hitEnemy = true; break;
               }
               if (obj.userData?.isEnemy) {
@@ -686,6 +708,7 @@ export const Player = () => {
                     socket.emit('ehit', { id: eid, damage: config.damage, point: pt }); // host applies
                   }
                 }
+                useStore.getState().addMoney(config.damage * ECON.moneyPerDamage);
                 anyEnemyHit = true;
                 isHit = true;
                 hitEnemy = true;
@@ -746,10 +769,10 @@ export const Player = () => {
         }
 
         // One feedback pulse for the whole shot: gold kill-marker + boom on a
-        // kill, else a white hitmarker + crisp tick.
+        // kill, else a white hitmarker + crisp tick. Kills pay the CS bonus.
         if (anyEnemyHit) {
           fireHitmarker(anyKill);
-          if (anyKill) playExplosionSound();
+          if (anyKill) { playExplosionSound(); useStore.getState().addMoney(ECON.killBonus); }
           else playHitTick();
         }
       }
