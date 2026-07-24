@@ -39,6 +39,7 @@ import { Ragdolls } from './Ragdolls';
 import { ShockRings } from './ShockRings';
 import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
+import { ChromeIdols } from './ChromeIdols';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -165,6 +166,7 @@ export const Game = () => {
         <ShockRings />
         <PhysProps />
         <Totems />
+        <ChromeIdols />
         <Creatures />
         <WorldEntities />
         <Train />

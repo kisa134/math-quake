@@ -40,6 +40,11 @@ export const ASSETS: AssetSpec[] = [
   // NOTE: id 'post' (not 'pillar') — the Synty FBX monument below already owns
   // the id 'pillar' and old placed props / decor may reference it.
   { id: 'post',     label: 'PILLAR',       category: 'build', src: '', loader: 'primitive', baseScale: 1, tags: { isWall: true },  prim: 'pillar',   buildable: true },
+  // --- forge3d chrome idols (V5 Wave C — owner drops, meshopt 463KB each) ---
+  { id: 'chrome1', label: 'CHROME IDOL I',   category: 'monument', src: 'props/chrome1.glb', loader: 'glb', baseScale: 4, tags: { isWall: true } },
+  { id: 'chrome2', label: 'CHROME IDOL II',  category: 'monument', src: 'props/chrome2.glb', loader: 'glb', baseScale: 4, tags: { isWall: true } },
+  { id: 'chrome3', label: 'CHROME IDOL III', category: 'monument', src: 'props/chrome3.glb', loader: 'glb', baseScale: 4, tags: { isWall: true } },
+
   // --- Your Meshy creatures (optimized GLB, keep textures) ---
   { id: 'skull',  label: 'WHITE SKULL',     category: 'creature', src: 'props/skull.glb',  loader: 'glb', baseScale: 6,  tags: { isFloor: true } },
   { id: 'bomber', label: 'BOMBER MASCOT',   category: 'creature', src: 'props/bomber.glb', loader: 'glb', baseScale: 6,  tags: { isFloor: true } },
