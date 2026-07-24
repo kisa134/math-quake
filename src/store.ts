@@ -3,6 +3,8 @@ import * as THREE from 'three';
 import { addTrauma } from './game/shake';
 import { type DebrisChunk, DEBRIS_CAP, makeChunks } from './game/voxel';
 import { WEAPON_PRICES, ECON } from './config/economy';
+import type { Position } from './game/market';
+import { chron } from './game/chronicle';
 
 interface Enemy {
   id: string;
@@ -109,6 +111,17 @@ interface GameState {
   ownedWeapons: boolean[];   // by WEAPONS index; free loadout owned from start
   buyMenuOpen: boolean;
   round: { num: number; phase: 'buy' | 'wave'; until: number }; // until = Date.now() ms deadline (buy phase)
+  // V7 W1: playable $SOUL index (hold Q = rose, tap Q = close). game/market.ts
+  position: Position | null;
+  marketWheelOpen: boolean;
+  marketLev: number;
+  lastLiq: number;                          // ms timestamp of the last margin call (vignette)
+  lastTrade: { amount: number; t: number }; // last realized PnL (HUD toast)
+  setMarketWheel: (open: boolean) => void;
+  setMarketLev: (lev: number) => void;
+  openPosition: (side: 1 | -1, entry: number) => void;
+  closePosition: (exit: number) => void;
+  liquidate: () => void;
   // V4.1: dragon riding + dopamine buffs (timestamps = active until)
   ridingDragon: number | null;
   buffs: { rage: number; surge: number; midas: number };
@@ -201,6 +214,11 @@ export const useStore = create<GameState>((set) => ({
   ownedWeapons: WEAPON_PRICES.map((p) => p === 0), // free loadout: wand + dagger
   buyMenuOpen: false,
   round: { num: 1, phase: 'buy', until: 0 },
+  position: null,
+  marketWheelOpen: false,
+  marketLev: 25,
+  lastLiq: 0,
+  lastTrade: { amount: 0, t: 0 },
   creatures: [],
   netCreatures: [],
   isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts
@@ -378,6 +396,42 @@ export const useStore = create<GameState>((set) => ({
     return { ownedWeapons: owned, money: s.money - price, currentWeapon: index };
   }),
   setBuyMenu: (open) => set({ buyMenuOpen: open }),
+  setMarketWheel: (open) => set({ marketWheelOpen: open }),
+  setMarketLev: (lev) => set({ marketLev: lev }),
+  // stake = 20% of the bag (min $200), no number entry — the two-second rule
+  openPosition: (side, entry) => set((s) => {
+    if (s.position || s.money < 200) return s;
+    const stake = Math.max(200, Math.floor(s.money * 0.2));
+    return {
+      position: { side, lev: s.marketLev, stake, entry, openedAt: Date.now() },
+      money: s.money - stake,
+    };
+  }),
+  closePosition: (exit) => set((s) => {
+    if (!s.position) return s;
+    const p = s.position;
+    const gain = Math.max(0, Math.round(p.stake * (1 + p.lev * p.side * (exit / p.entry - 1))));
+    const profit = gain - p.stake;
+    if (profit >= 1000) chron(`▲ трейд закрыт: +$${profit}`);
+    return {
+      position: null,
+      money: Math.min(ECON.maxMoney, s.money + gain),
+      lastTrade: { amount: profit, t: Date.now() },
+    };
+  }),
+  // margin call: the stake is gone and the body pays the difference — never fatal
+  liquidate: () => set((s) => {
+    if (!s.position) return s;
+    addTrauma(0.5);
+    chron(`† МАРЖИН-КОЛЛ: −$${s.position.stake}`);
+    return {
+      position: null,
+      lastLiq: Date.now(),
+      lastTrade: { amount: -s.position.stake, t: Date.now() },
+      jetpackStunUntil: Date.now() + 1500,
+      health: s.god ? s.health : Math.max(25, s.health - 25),
+    };
+  }),
   setRound: (r) => set({ round: r }),
   setCreatures: (c) => set({ creatures: c }),
   setNetCreatures: (c) => set({ netCreatures: c }),

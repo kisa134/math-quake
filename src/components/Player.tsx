@@ -6,6 +6,7 @@ import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
 import { playShootSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
+import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -146,6 +147,12 @@ export const Player = () => {
       if (!isPlaying) return;
       const st = useStore.getState();
       if (e.code === 'KeyE') { if (!e.repeat) st.setSpellWheel(true); return; } // hold E → spell wheel
+      if (e.code === 'KeyQ') {                                                  // V7 $SOUL: tap w/ position = close, hold = rose
+        if (e.repeat) return;
+        if (st.position) { st.closePosition(marketNow.price); playHitTick(); }
+        else st.setMarketWheel(true);
+        return;
+      }
       if (e.code === 'KeyP') { st.setBuyMenu(!st.buyMenuOpen); return; }        // CS buy menu
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
@@ -195,13 +202,14 @@ export const Player = () => {
     };
     const handleKeyUp = (e: KeyboardEvent) => {
       if (e.code === 'KeyE') useStore.getState().setSpellWheel(false); // release → commit + close
+      if (e.code === 'KeyQ') useStore.getState().setMarketWheel(false); // release → rose commits
     };
     // Mouse-wheel cycles the whole arsenal (reaches weapons 10-20). Editor owns
     // the wheel in build mode; the spell wheel owns it while open.
     const handleWheel = (e: WheelEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
-      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen) return;
+      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen) return;
       const n = WEAPONS.length;
       const dir = e.deltaY > 0 ? 1 : -1;
       // cycle to the next OWNED weapon (you only carry what you bought)
@@ -232,7 +240,17 @@ export const Player = () => {
   // UI shows a "click to play" overlay instead and re-locks on click. Pointer
   // lock is acquired via that overlay (a user gesture), not auto-locked here.
 
-  useFrame((_, delta) => {
+  useFrame((fs, delta) => {
+    // V7 W1: the $SOUL index ticks on the liturgy clock — even while menus are
+    // open, so the rose/strip stay live and liquidations never wait for you.
+    tickMarket(fs.clock.elapsedTime);
+    {
+      const pos = useStore.getState().position;
+      if (pos && isLiquidated(pos, marketNow.price)) {
+        useStore.getState().liquidate();
+        playExplosionSound();
+      }
+    }
     if (!controlsRef.current || !controlsRef.current.isLocked || !isPlaying || !playerRef.current) return;
 
     // In build/editor mode, LMB/RMB place & delete props (see Editor.tsx), so
@@ -735,7 +753,7 @@ export const Player = () => {
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
     // V4 CS gunfeel: minigun heat (spin-up rate + growing cone) + spray reset
-    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen;
+    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen;
     if (config.heat) {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;

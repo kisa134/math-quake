@@ -26,6 +26,7 @@ export const P_LIQ =   [0.008, 0.004, 0.006, 0.06, 0.11, 0.004];
 export const P_COMET = [0.003, 0.035, 0.006, 0.003, 0.003, 0.003];
 
 export const CYCLE = 75;
+export const EPOCH_DUR = DUR; // V7: the $SOUL index integrates price over epochs
 const N = 6;
 // prefix sums of duration / warped-time / heart-phase (constants, built once)
 const T0: number[] = [0];

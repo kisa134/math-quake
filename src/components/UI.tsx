@@ -12,6 +12,8 @@ import { chronicle } from '../game/chronicle';
 import { combo } from '../game/combo';
 import { WeaponHUD } from './WeaponHUD';
 import { SpellWheel } from './SpellWheel';
+import { MarketWheel } from './MarketWheel';
+import { MarketStrip } from './MarketStrip';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -76,6 +78,8 @@ export const UI = () => {
           <ChronicleFeed />
           <ComboBadge />
           <SpellWheel />
+          <MarketWheel />
+          <MarketStrip />
           <BuyMenu />
 
           {!editorMode && <WeaponHUD />}
