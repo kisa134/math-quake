@@ -13,7 +13,7 @@ import { ragdollInbox } from '../game/botHorde';
  * 2.4s — then dissolve into voxel gore and return to the pool. 18 short-lived
  * bodies inside the physics budget; far deaths keep the cheap debris burst.
  */
-const POOL = 3;
+const POOL = 4;
 const LIFE_MS = 2400;
 const PART_DEFS = [
   { key: 'head', dx: 0, dy: 1.5, hx: 0.21, hy: 0.21, hz: 0.21 },

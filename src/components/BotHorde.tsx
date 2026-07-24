@@ -14,8 +14,9 @@ import {
 } from '../game/botHorde';
 import { creatureLive, creatureHitInbox } from '../game/creatureNet';
 import { chron } from '../game/chronicle';
-import { conductorState } from '../game/conductor';
+import { conductorState, hash01 } from '../game/conductor';
 import { tryPortal } from '../game/portals';
+import { ROAD_DECK, ROAD_DECK_TOP } from '../config/trackSpline';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -53,6 +54,25 @@ const SPAWN_ANCHORS: [number, number, number][] = [
   [0, 86, 0], [0, 86, 0], [0, 86, 0], // Жерло — главный поток
   [100, 86, 100], [-100, 86, 100], [100, 86, -100], [-100, 86, -100],
 ];
+
+// V7.5 Ц2 — АМБИЕНТ-СЛОЙ: мир живёт и без раундов. Три сцены жизни.
+const AMBIENT_TARGET = 14;
+const RR = 9; // ground-ray round-robin step (64/9 ≈ 7 лучей/кадр — закон)
+function ambientSpot(): [number, number, number] {
+  const roll = Math.random();
+  if (roll < 0.4) { // периметр Торгового Пола — дуэли видны со спавна
+    const a = Math.random() * Math.PI * 2;
+    const r = 100 + Math.random() * 40;
+    return [Math.cos(a) * r, 90, Math.sin(a) * r];
+  }
+  if (roll < 0.8) { // войд-кольцо среди обелисков
+    const a = Math.random() * Math.PI * 2;
+    const r = 250 + Math.random() * 400;
+    return [Math.cos(a) * r, -40, Math.sin(a) * r];
+  }
+  // у трек-дека с тачками
+  return [ROAD_DECK.x + (Math.random() - 0.5) * 80, ROAD_DECK_TOP + 4, ROAD_DECK.z + (Math.random() - 0.5) * 80];
+}
 
 /** Write one bot's 6 part matrices + proxy + color. */
 function writeBot(
@@ -116,6 +136,7 @@ export const BotHorde = () => {
   const rrFrame = useRef(0);
   const lastSync = useRef(0);
   const archonEpoch = useRef(-1); // V5 C7: one Archon per scheduled capitulation
+  const lastAmbient = useRef(0);  // V7.5 Ц2: ambient upkeep throttle
 
   useLayoutEffect(() => {
     for (const m of [headRef.current, torsoRef.current, armsRef.current, legsRef.current]) {
@@ -168,8 +189,9 @@ export const BotHorde = () => {
     ringInbox.push({ x: b.x, y: b.y + 0.5, z: b.z });
     // dopamine: 22% chance the corpse drops a buff orb (personal loot)
     if (Math.random() < 0.22) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
-    // chronicle: the world narrates its violence
-    chron(b.mut === 'ARCHON' ? '☠ МЕДВЕДЬ-АРХОНТ ПАЛ' : b.mut === 'DEVOURER' ? '☠ ПОЖИРАТЕЛЬ насытился навсегда' : `${b.mut} разлетелся вокселями`);
+    // chronicle: the world narrates its violence (ambient deaths mostly silent)
+    if (!b.ambient || Math.random() < 0.3)
+      chron(b.mut === 'ARCHON' ? '☠ МЕДВЕДЬ-АРХОНТ ПАЛ' : b.mut === 'DEVOURER' ? '☠ ПОЖИРАТЕЛЬ насытился навсегда' : `${b.mut} разлетелся вокселями`);
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
     slotOf.current.delete(b.id);
@@ -204,6 +226,7 @@ export const BotHorde = () => {
         const b = bots.current.find((o) => o.id === hit.id);
         if (!b) continue;
         b.hp -= hit.damage;
+        if (b.ambient) b.aggro = true; // амбиент агрится только в ответ
         if (hit.damage >= 35 && b.hp > 0 && b.mut !== 'DEVOURER') {
           const free = [1, 2, 4, 8, 16].filter((bit) => !(b.limbMask & bit));
           if (free.length) {
@@ -231,10 +254,37 @@ export const BotHorde = () => {
         addTrauma(0.25);
       }
 
+      // V7.5 Ц2: ambient upkeep — пары-дуэлянты и бродилки по трём сценам
+      const nowUp = performance.now();
+      if (nowUp - lastAmbient.current > 2000) {
+        lastAmbient.current = nowUp;
+        let ambientCount = 0;
+        for (const b of bots.current) if (b.ambient) ambientCount++;
+        if (ambientCount < AMBIENT_TARGET && bots.current.length < BOT_CAP - 18) {
+          const spot = ambientSpot();
+          const duel = Math.random() < 0.7 && ambientCount < AMBIENT_TARGET - 1;
+          const mk = (dx: number, dz: number) => {
+            const bot = makeBot(rollMutation(Math.random), spot[0] + dx, spot[1] + 4, spot[2] + dz);
+            bot.ambient = true;
+            bots.current.push(bot);
+            return bot;
+          };
+          if (duel) {
+            const a = mk(-1.6, 0), c = mk(1.6, 0);
+            a.duelWith = c.id; c.duelWith = a.id;
+          } else {
+            const solo = mk(0, 0);
+            if (Math.random() < 0.2) solo.duelWith = -2; // охотник на существ
+          }
+          slotOf.current.clear();
+          bots.current.forEach((b, i) => slotOf.current.set(b.id, i));
+          lastPainted.current.clear();
+        }
+      }
+
       // sim
-      rrFrame.current = (rrFrame.current + 1) % 7;
+      rrFrame.current = (rrFrame.current + 1) % RR;
       const remotes = Object.values(st.remotePlayers);
-      _aliveCount = bots.current.length;
       for (let i = 0; i < bots.current.length; i++) {
         const b = bots.current[i];
         const mut = MUT_BY_ID[b.mut];
@@ -246,6 +296,41 @@ export const BotHorde = () => {
         for (const rp of remotes) {
           const d = (rp.x - b.x) ** 2 + (rp.z - b.z) ** 2;
           if (d < best) { best = d; tx = rp.x; ty = rp.y; tz = rp.z; }
+        }
+        // V7.5 Ц2: ambient life overrides the hunt — duels, wandering, hunters
+        if (b.ambient && !b.aggro) {
+          const now2 = state.clock.elapsedTime;
+          const mate = b.duelWith !== undefined && b.duelWith >= 0
+            ? bots.current.find((o) => o.id === b.duelWith) : undefined;
+          if (mate) {
+            tx = mate.x; ty = mate.y; tz = mate.z;
+            const d2 = (mate.x - b.x) ** 2 + (mate.z - b.z) ** 2;
+            if (d2 < (2.2 * b.scale) ** 2 && now2 > (b.nextMeleeAt ?? 0)) {
+              b.nextMeleeAt = now2 + 0.9;
+              botHitInbox.push({ id: mate.id, damage: 12 });
+            }
+          } else {
+            // waypoint wander: a fresh hash-scheduled point every ~6s
+            const seg = Math.floor(now2 / 6);
+            if (b.wpSeg !== seg) {
+              b.wpSeg = seg;
+              b.wpX = b.x + (hash01(b.id, seg) - 0.5) * 80;
+              b.wpZ = b.z + (hash01(b.id * 7 + 1, seg) - 0.5) * 80;
+            }
+            tx = b.wpX!; tz = b.wpZ!; ty = b.y;
+            if (b.duelWith === -2 && now2 > (b.nextMeleeAt ?? 0)) {
+              // hunter: nearest creature is the show
+              let pd = Infinity;
+              creatureLive.forEach((c, cid) => {
+                const d = (c.x - b.x) ** 2 + (c.z - b.z) ** 2;
+                if (d < pd) { pd = d; tx = c.x; ty = c.y; tz = c.z; }
+                if (d < (2.2 * b.scale) ** 2) {
+                  creatureHitInbox.push({ id: cid, damage: 30 });
+                  b.nextMeleeAt = now2 + 0.9;
+                }
+              });
+            }
+          }
         }
         if (mut.behavior === 'devour') {
           // prey: nearest other bot, else nearest creature
@@ -307,7 +392,7 @@ export const BotHorde = () => {
         }
 
         // gravity + ground (round-robin rays, far-clamped: the raycast law)
-        if (slot % 7 === rrFrame.current) {
+        if (slot % RR === rrFrame.current) {
           _rayOrigin.set(b.x, b.y + 2, b.z);
           _groundRay.set(_rayOrigin, _rayDir);
           _groundRay.near = 0;
@@ -330,7 +415,7 @@ export const BotHorde = () => {
         b.vy -= G * dt;
         b.y += b.vy * dt;
         if (b.y <= groundY.current[slot]) { b.y = groundY.current[slot]; b.vy = 0; }
-        if (b.y < -45) { // fell off the world — silent removal
+        if (b.y < -60) { // fell off the world — silent removal (void floor is −50!)
           const s = slotOf.current.get(b.id);
           if (s !== undefined) { bots.current = bots.current.filter((o) => o.id !== b.id); slotOf.current.delete(b.id); }
           continue;
@@ -353,23 +438,29 @@ export const BotHorde = () => {
         const proxy = proxyRefs.current[slot];
         if (proxy) proxy.userData.id = String(b.id);
       }
-      _aliveCount = bots.current.length;
+      // round-win counter ignores the ambient layer (Ц2 carve-out)
+      _aliveCount = 0;
+      for (const b of bots.current) if (!b.ambient) _aliveCount++;
 
-      // 6Hz snapshot to peers
+      // 6Hz snapshot to peers (0.1u precision — 40% lighter payload)
       const nowMs = performance.now();
       if (nowMs - lastSync.current > 160) {
         lastSync.current = nowMs;
         socket.emit('bots', {
           list: bots.current.map((b) => ({
-            id: b.id, mut: b.mut, x: b.x, y: b.y, z: b.z,
-            h: b.heading, lm: b.limbMask, hp: b.hp, s: b.scale,
+            id: b.id, mut: b.mut,
+            x: Math.round(b.x * 10) / 10, y: Math.round(b.y * 10) / 10, z: Math.round(b.z * 10) / 10,
+            h: Math.round(b.heading * 100) / 100, lm: b.limbMask, hp: b.hp,
+            s: Math.round(b.scale * 100) / 100,
+            ...(b.ambient ? { a: 1 as const } : {}),
           })),
         });
       }
     } else {
       // ---- non-host mirror: lerp toward the snapshot ----
       const list = netBots.list;
-      _aliveCount = list.length;
+      _aliveCount = 0;
+      for (const nb of list) if (!nb.a) _aliveCount++;
       const seen = new Set<number>();
       for (let i = 0; i < Math.min(list.length, BOT_CAP); i++) {
         const nb = list[i];

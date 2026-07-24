@@ -20,18 +20,19 @@ export interface MutationSpec {
 }
 
 // Безумное многообразие класса «белый чувак»
+// V7.5: HP re-tuned for the 16-gun arsenal (everything hits harder now)
 export const MUTATIONS: MutationSpec[] = [
-  { id: 'BONE',    color: '#f5f0e6', scale: 1.0, hp: 100, speed: 6,   behavior: 'rush',   weight: 30 },
-  { id: 'BERSERK', color: '#e63946', scale: 1.05, hp: 80,  speed: 11,  behavior: 'rush',   weight: 18 },
-  { id: 'GOLDBOY', color: '#ffd166', scale: 1.0, hp: 60,  speed: 8.5, behavior: 'flee',   weight: 10 },
-  { id: 'WINE',    color: '#9d174d', scale: 1.1, hp: 120, speed: 6.5, behavior: 'hop',    weight: 14 },
-  { id: 'GLITCH',  color: '#b5179e', scale: 0.95, hp: 90, speed: 7.5, behavior: 'strafe', weight: 12 },
-  { id: 'MIDGET',  color: '#efe2c8', scale: 0.6, hp: 45,  speed: 9,   behavior: 'swarm',  weight: 12 },
-  { id: 'GIANT',   color: '#8d99ae', scale: 1.8, hp: 300, speed: 4,   behavior: 'tank',   weight: 4 },
+  { id: 'BONE',    color: '#f5f0e6', scale: 1.0, hp: 140, speed: 6,   behavior: 'rush',   weight: 30 },
+  { id: 'BERSERK', color: '#e63946', scale: 1.05, hp: 110, speed: 11,  behavior: 'rush',   weight: 18 },
+  { id: 'GOLDBOY', color: '#ffd166', scale: 1.0, hp: 80,  speed: 8.5, behavior: 'flee',   weight: 10 },
+  { id: 'WINE',    color: '#9d174d', scale: 1.1, hp: 170, speed: 6.5, behavior: 'hop',    weight: 14 },
+  { id: 'GLITCH',  color: '#b5179e', scale: 0.95, hp: 120, speed: 7.5, behavior: 'strafe', weight: 12 },
+  { id: 'MIDGET',  color: '#efe2c8', scale: 0.6, hp: 60,  speed: 9,   behavior: 'swarm',  weight: 12 },
+  { id: 'GIANT',   color: '#8d99ae', scale: 1.8, hp: 450, speed: 4,   behavior: 'tank',   weight: 4 },
   // Пожиратель: не выпадает случайно — приходит по расписанию раундов.
-  { id: 'DEVOURER', color: '#12060c', scale: 3.2, hp: 900, speed: 3.2, behavior: 'devour', weight: 0 },
+  { id: 'DEVOURER', color: '#12060c', scale: 3.2, hp: 1200, speed: 3.2, behavior: 'devour', weight: 0 },
   // V5 C7: БОСС ЭПОХИ — Медведь-Архонт. Приходит в КАПИТУЛЯЦИЮ, кримзон-гигант.
-  { id: 'ARCHON', color: '#ff2d55', scale: 2.6, hp: 1500, speed: 5, behavior: 'tank', weight: 0 },
+  { id: 'ARCHON', color: '#ff2d55', scale: 2.6, hp: 2200, speed: 5, behavior: 'tank', weight: 0 },
 ];
 export const MUT_BY_ID: Record<string, MutationSpec> = Object.fromEntries(MUTATIONS.map((m) => [m.id, m]));
 
@@ -47,9 +48,17 @@ export interface Bot {
   scale: number;        // live scale (devourer grows)
   strafeDir: number;    // for strafe behavior
   nextHopAt: number;
+  // V7.5 Ц2 — ambient layer («жизнь»): never gates round wins, never hunts
+  // the player unless shot first. duelWith −2 = creature hunter.
+  ambient?: boolean;
+  duelWith?: number;
+  aggro?: boolean;
+  nextMeleeAt?: number;
+  wpSeg?: number;       // waypoint schedule segment
+  wpX?: number; wpZ?: number;
 }
 
-export const BOT_CAP = 40;
+export const BOT_CAP = 64;
 
 /** Weighted mutation roll (host spawn). */
 export function rollMutation(rand: () => number): MutationSpec {
@@ -93,5 +102,6 @@ export const ringInbox: { x: number; y: number; z: number }[] = [];
 export interface NetBot {
   id: number; mut: string; x: number; y: number; z: number;
   h: number; lm: number; hp: number; s: number;
+  a?: 1; // ambient flag (peers exclude from the round-win count)
 }
 export const netBots: { list: NetBot[] } = { list: [] };

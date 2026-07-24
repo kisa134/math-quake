@@ -26,10 +26,10 @@ export const ECON = {
 
 export const MATCH = {
   buySeconds: 8,         // buy-phase length between rounds (V4.2: снят простой)
-  waveBase: 9,           // bots in round 1 (V4.2: сразу мясо)
-  wavePerRound: 3,       // +bots each round
-  waveCap: 30,           // horde renders instanced; analytic sim carries 30 fine
-  spawnGapMs: 700,       // spacing between bot spawns within a wave
+  waveBase: 12,          // bots in round 1 (V7.5: цирк — сразу толпа)
+  wavePerRound: 4,       // +bots each round
+  waveCap: 45,           // BOT_CAP 64: волна ≤31 + амбиент 16 + Архонт влезают
+  spawnGapMs: 550,       // spacing between bot spawns within a wave
 };
 
 export const wavesSize = (round: number) =>
