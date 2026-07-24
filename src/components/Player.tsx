@@ -7,6 +7,7 @@ import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
 import { playShootSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
 import { tickMarket, marketNow, isLiquidated } from '../game/market';
+import { noteKill } from '../game/tradingDay';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -881,7 +882,7 @@ export const Player = () => {
           }
           if (anyHit) {
             fireHitmarker(anyKill);
-            if (anyKill) { playExplosionSound(); useStore.getState().addMoney(Math.round(ECON.killBonus * registerKill())); }
+            if (anyKill) { playExplosionSound(); noteKill(); useStore.getState().addMoney(Math.round(ECON.killBonus * registerKill())); }
             else playHitTick();
           }
         } else if (spell.kind === 'nova') {

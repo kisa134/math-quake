@@ -15,7 +15,7 @@ export const WEAPON_PRICES = [0, 1200, 2700, 4750, 0, 2900, 6500, 900, 0];
 
 export const ECON = {
   startMoney: 800,
-  maxMoney: 16000,
+  maxMoney: 1_000_000, // V7: the arc's ceiling — carrying out a million = legend
   moneyPerDamage: 2,     // $ per point of damage you land (smooth, always local)
   killBonus: 150,        // extra when your shot visibly kills (host-side detect)
   roundWinBase: 1000,    // + roundWinPerRound × round

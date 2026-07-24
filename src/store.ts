@@ -5,6 +5,7 @@ import { type DebrisChunk, DEBRIS_CAP, makeChunks } from './game/voxel';
 import { WEAPON_PRICES, ECON } from './config/economy';
 import type { Position } from './game/market';
 import { chron } from './game/chronicle';
+import { noteTrade, noteLiq } from './game/tradingDay';
 
 interface Enemy {
   id: string;
@@ -412,6 +413,7 @@ export const useStore = create<GameState>((set) => ({
     const p = s.position;
     const gain = Math.max(0, Math.round(p.stake * (1 + p.lev * p.side * (exit / p.entry - 1))));
     const profit = gain - p.stake;
+    noteTrade(profit);
     if (profit >= 1000) chron(`▲ трейд закрыт: +$${profit}`);
     return {
       position: null,
@@ -423,6 +425,7 @@ export const useStore = create<GameState>((set) => ({
   liquidate: () => set((s) => {
     if (!s.position) return s;
     addTrauma(0.5);
+    noteLiq(s.position.stake);
     chron(`† МАРЖИН-КОЛЛ: −$${s.position.stake}`);
     return {
       position: null,
