@@ -1,7 +1,8 @@
 import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { BLACK_HOLE } from '../game/voxCandles';
+import { BLACK_HOLE, conductorState } from '../game/voxCandles';
+import { blackHoleFeed } from './VoxelCandles';
 
 /**
  * V3.1 — the all-consuming BLACK-HOLE DONUT at the heart of the candle
@@ -26,17 +27,19 @@ const rimVertex = /* glsl */ `
 
 const rimFragment = /* glsl */ `
   uniform float uTime;
+  uniform float uHeart; // conductor heart phase (radians) — the market's pulse
+  uniform float uFeed;  // 0..1 feed flash when the donut swallows a candle
   varying float vRing;
   vec3 hsv2rgb(vec3 c) {
     vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0/3.0, 1.0/3.0)) * 6.0 - 3.0);
     return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
   }
   void main() {
-    float hue = fract(vRing * 3.0 - uTime * 0.22);
-    float pulse = 0.75 + 0.45 * sin(uTime * 2.2 + vRing * 25.0);
-    // glitch bands flickering around the ring
+    // rainbow runs faster while feeding — она облизывается
+    float hue = fract(vRing * 3.0 - uTime * 0.22 * (1.0 + uFeed * 3.0));
+    float pulse = 0.75 + 0.45 * sin(uHeart + vRing * 25.0);
     float band = step(0.86, fract(vRing * 40.0 + floor(uTime * 7.0) * 0.37));
-    vec3 c = hsv2rgb(vec3(hue, 1.0, 1.0)) * pulse * (1.0 + band * 1.2);
+    vec3 c = hsv2rgb(vec3(hue, 1.0, 1.0)) * pulse * (1.0 + band * 1.2) * (1.0 + uFeed * 1.5);
     gl_FragColor = vec4(c * 2.2, 0.92); // hot → Bloom eats it
   }
 `;
@@ -63,7 +66,7 @@ const voidFragment = /* glsl */ `
 export const BlackHole = () => {
   const groupRef = useRef<THREE.Group>(null);
   const rimMat = useMemo(() => new THREE.ShaderMaterial({
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uHeart: { value: 0 }, uFeed: { value: 0 } },
     vertexShader: rimVertex,
     fragmentShader: rimFragment,
     transparent: true,
@@ -80,12 +83,18 @@ export const BlackHole = () => {
 
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
+    const cs = conductorState(t);
+    // feed flash decays exp(−2τ); swallows push it back to 1
+    blackHoleFeed.v = Math.max(0, blackHoleFeed.v - blackHoleFeed.v * 2 * dt);
     rimMat.uniforms.uTime.value = t;
+    rimMat.uniforms.uHeart.value = cs.heartPhase; // 0.9 Гц покой → 2.8 Гц тахикардия капитуляции
+    rimMat.uniforms.uFeed.value = blackHoleFeed.v;
     voidMat.uniforms.uTime.value = t;
     if (groupRef.current) {
-      groupRef.current.rotation.y += dt * 0.06;         // slow menace spin
+      // spins faster at the extremes of greed and fear; indifferent only to SILENCE
+      groupRef.current.rotation.y += dt * 0.06 * (1 + 0.5 * Math.abs(cs.S));
       groupRef.current.rotation.x = Math.sin(t * 0.05) * 0.16; // lazy precession
-      const s = 1 + Math.sin(t * 1.8) * 0.025;          // мега-пульс
+      const s = 1 + Math.sin(cs.heartPhase) * 0.025;    // мега-пульс в такт сердцу рынка
       groupRef.current.scale.setScalar(s);
     }
   });

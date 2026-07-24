@@ -19,6 +19,7 @@ import { Creatures } from './Creatures';
 import { VoxelCandles } from './VoxelCandles';
 import { Dreamscape } from './Dreamscape';
 import { BlackHole } from './BlackHole';
+import { MovingAverages } from './MovingAverages';
 import { Editor } from './Editor';
 import { PostFX } from './PostFX';
 import { useEffect, useRef } from 'react';
@@ -125,6 +126,7 @@ export const Game = () => {
         <Cityscape />
         <Dreamscape />
         <BlackHole />
+        <MovingAverages />
         <VoxelCandles />
         <Player />
         <LocalMinions />

@@ -1,58 +1,55 @@
 import type { DebrisChunk } from './voxel';
+import {
+  hash01, warpTime, conductorState, eventFor, epochBounds,
+  LIQ_DUR, COMET_DUR, RESURRECT_DELAY, type ConductorState, type CandleEvent,
+} from './conductor';
 
 /**
- * Teardown-style VOXEL trading candles (V2.1). Pure data + carve logic — the
- * renderer is components/VoxelCandles.tsx. Each candle is a small voxel grid
- * (body + up/down wicks, like a real chart candle) frozen mid-explosion at
- * reachable heights; shooting carves voxels out in a radius, carved voxels fly
- * off through the existing Debris pool. Deterministic (seeded) so both players
- * see the same candles; carves replicate via the 'vox' broadcast into voxInbox.
+ * V4.3 «Литургия ликвидаций» — the candle universe core (spec:
+ * docs/LITURGY_OF_LIQUIDATIONS.md). 180 voxel chart-candles in three belts
+ * orbit the black-hole donut; four analytic breathing layers make the space
+ * feel alive WITHOUT any N² physics; a deterministic hash-schedule sends souls
+ * off their orbits — liquidation spirals INTO the donut, pump comets OUT.
+ * Everything is a pure function of (t); both clients watch the same liturgy.
  */
 export interface VoxCandle {
   id: number;
-  pos: [number, number, number]; // seed position (used as fallback)
+  pos: [number, number, number];
   bull: boolean;
-  phase: number;  // orbit phase
-  amp: number;    // legacy bob amplitude (unused in orbit mode)
-  speed: number;  // legacy bob speed (unused in orbit mode)
-  voxStart: number; // index of first voxel in the global arrays
+  phase: number;
+  voxStart: number;
   voxCount: number;
-  // V3.1 «вселенная»: every candle ORBITS the central black hole like a star.
-  orbitR: number;   // orbit radius from the black-hole axis
-  angSpeed: number; // rad/s (flat rotation curve: slower far out)
-  incSin: number;   // orbit-plane inclination (precomputed sin/cos)
+  orbitR: number;
+  angSpeed: number;
+  incSin: number;
   incCos: number;
-}
-
-/** The all-consuming donut sits here; orbits center on it.
- *  V4.2 visibility pass: lowered 300→235 — it LOOMS over the arena now,
- *  the candle universe wheels straight over your head at spawn. */
-export const BLACK_HOLE = { x: 0, y: 235, z: 0, ringR: 110, tubeR: 34 };
-
-/** Analytic orbital base position of a candle at time t (zero-alloc via out). */
-export function candleBasePos(c: VoxCandle, t: number, out: { x: number; y: number; z: number }) {
-  const th = c.phase + t * c.angSpeed;
-  const x = Math.cos(th) * c.orbitR;
-  const z0 = Math.sin(th) * c.orbitR;
-  out.x = BLACK_HOLE.x + x;
-  out.y = BLACK_HOLE.y + z0 * c.incSin;
-  out.z = BLACK_HOLE.z + z0 * c.incCos;
+  // V4.3 population
+  belt: 0 | 1 | 2;      // inner ритейл / mid смарт-мани / halo холдеры
+  voxScale: number;     // 1 retail · 1.15 fund · 1.5 WHALE
+  phiR: number;         // epicycle phase (precomputed hash)
+  patronIdx: number;    // whale index in `candles` this soul follows (-1 = none)
 }
 
 export interface VoxData {
   candles: VoxCandle[];
-  // per-voxel, global across all candles:
-  local: Float32Array;   // xyz local offset from candle base (stride 3)
-  shade: Float32Array;   // per-voxel brightness variance 0.75..1.15
+  local: Float32Array;
+  shade: Float32Array;
   total: number;
+  /** cascade helper: anchor innerId → [4 phase-neighbour candle ids] */
+  neighborsOf: Map<number, number[]>;
 }
 
-export const VOX_SIZE = 0.8;       // world size of one voxel cube
-export const COLLAPSE_AT = 0.25;   // alive fraction below which the candle bursts
+export const VOX_SIZE = 0.8;
+export const COLLAPSE_AT = 0.25;
 
-// Cross-module inbox: socket.ts pushes remote carves here; VoxelCandles drains
-// it in useFrame (mirrors creatureHitInbox — avoids an import cycle).
+/** The all-consuming donut; the universe wheels around it, looming over spawn. */
+export const BLACK_HOLE = { x: 0, y: 235, z: 0, ringR: 110, tubeR: 34 };
+
 export const voxInbox: { id: number; x: number; y: number; z: number; r: number }[] = [];
+
+// belt tables (spec §1/§2)
+const BELT_WAVE_AMP = [6, 9, 14];
+const BELT_MA_R = [120, 270, 470]; // MA-20 radius is animated by the conductor
 
 const mulberry32 = (seed: number) => {
   let a = seed >>> 0;
@@ -64,8 +61,7 @@ const mulberry32 = (seed: number) => {
   };
 };
 
-/** Build the seeded candle field: ~44 candles ringing the arena at grapple-able
- *  heights, denser low, a few sentinels high on the climb route. */
+/** 180 souls: 74 inner (retail pit) / 68 mid (smart money) / 38 halo (eternity). */
 export function generateVoxCandles(seed = 0xcafe): VoxData {
   const rnd = mulberry32(seed);
   const candles: VoxCandle[] = [];
@@ -73,64 +69,194 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
   const shadeArr: number[] = [];
   let vox = 0;
 
-  const addCandle = (x: number, y: number, z: number, orbitR = 0) => {
+  const addCandle = (belt: 0 | 1 | 2, rMin: number, rMax: number) => {
     const bull = rnd() > 0.45;
-    // chart-candle voxel layout: body 3×H×3 + top wick + bottom wick (1×n×1)
-    const bodyH = 5 + Math.floor(rnd() * 4);      // 5..8
-    const wickUp = 2 + Math.floor(rnd() * 3);     // 2..4
-    const wickDn = 1 + Math.floor(rnd() * 2);     // 1..2
+    // Pareto wealth: 78% retail / 14% funds / 8% WHALES
+    const wealth = rnd();
+    const sizeClass = wealth < 0.78 ? 0 : wealth < 0.92 ? 1 : 2;
+    const bodyH = sizeClass === 0 ? 4 + Math.floor(rnd() * 3)
+      : sizeClass === 1 ? 7 + Math.floor(rnd() * 3)
+      : 10 + Math.floor(rnd() * 5);
+    const voxScale = sizeClass === 0 ? 1 : sizeClass === 1 ? 1.15 : 1.5;
+    const wickUp = 2 + Math.floor(rnd() * 3);
+    const wickDn = 1 + Math.floor(rnd() * 2);
     const start = vox;
     const s = VOX_SIZE;
-    for (let by = 0; by < bodyH; by++) {
-      for (let bx = -1; bx <= 1; bx++) {
+    for (let by = 0; by < bodyH; by++)
+      for (let bx = -1; bx <= 1; bx++)
         for (let bz = -1; bz <= 1; bz++) {
           localArr.push(bx * s, (by + 0.5) * s, bz * s);
           shadeArr.push(0.75 + rnd() * 0.4);
           vox++;
         }
-      }
-    }
-    for (let wy = 0; wy < wickUp; wy++) {
-      localArr.push(0, (bodyH + wy + 0.5) * s, 0);
-      shadeArr.push(0.9 + rnd() * 0.25);
-      vox++;
-    }
-    for (let wy = 0; wy < wickDn; wy++) {
-      localArr.push(0, -(wy + 0.5) * s, 0);
-      shadeArr.push(0.9 + rnd() * 0.25);
-      vox++;
-    }
-    const R = orbitR || 70 + rnd() * 450;
+    for (let wy = 0; wy < wickUp; wy++) { localArr.push(0, (bodyH + wy + 0.5) * s, 0); shadeArr.push(0.9 + rnd() * 0.25); vox++; }
+    for (let wy = 0; wy < wickDn; wy++) { localArr.push(0, -(wy + 0.5) * s, 0); shadeArr.push(0.9 + rnd() * 0.25); vox++; }
+    const R = rMin + rnd() * (rMax - rMin);
     candles.push({
       id: candles.length,
-      pos: [x, y, z],
+      pos: [0, 0, 0],
       bull,
       phase: rnd() * Math.PI * 2,
-      amp: 1 + rnd() * 2,
-      speed: 0.2 + rnd() * 0.5,
       voxStart: start,
       voxCount: vox - start,
-      // flat rotation curve: tangential speed ~2.2–5.2 u/s everywhere → calm
-      // starfield drift, ride-able with the grapple
       orbitR: R,
-      angSpeed: (2.2 + rnd() * 3) / R,
+      angSpeed: (2.2 + rnd() * 3) / R, // flat rotation curve: 2.2–5.2 u/s everywhere
       incSin: Math.sin((rnd() - 0.5) * 1.2),
       incCos: Math.cos((rnd() - 0.5) * 1.2),
+      belt,
+      voxScale,
+      phiR: rnd() * Math.PI * 2,
+      patronIdx: -1,
     });
   };
 
-  // «вселенная»: 90 star-candles orbiting the central black hole. Dense inner
-  // belt (reachable from the arena/towers), sparser far shells.
-  for (let i = 0; i < 46; i++) addCandle(0, 0, 0, 70 + rnd() * 160);   // inner belt
-  for (let i = 0; i < 30; i++) addCandle(0, 0, 0, 230 + rnd() * 170);  // mid shell
-  for (let i = 0; i < 14; i++) addCandle(0, 0, 0, 400 + rnd() * 140);  // outer halo
+  for (let i = 0; i < 74; i++) addCandle(0, 70, 170);
+  for (let i = 0; i < 68; i++) addCandle(1, 210, 330);
+  for (let i = 0; i < 38; i++) addCandle(2, 380, 560);
 
-  return {
-    candles,
-    local: new Float32Array(localArr),
-    shade: new Float32Array(shadeArr),
-    total: vox,
-  };
+  // patrons: every non-whale follows a whale of its own belt (кит ведёт шлейф)
+  for (let belt = 0; belt < 3; belt++) {
+    const whales = candles.filter((c) => c.belt === belt && c.voxScale === 1.5);
+    if (!whales.length) continue;
+    for (const c of candles) {
+      if (c.belt !== belt || c.voxScale === 1.5) continue;
+      c.patronIdx = whales[Math.floor(hash01(c.id, 777) * whales.length)].id;
+    }
+  }
+
+  // cascade neighbours: 4 nearest by phase within the inner belt (built on seed)
+  const inner = candles.filter((c) => c.belt === 0).sort((a, b) => a.phase - b.phase);
+  const neighborsOf = new Map<number, number[]>();
+  for (let i = 0; i < inner.length; i++) {
+    const n: number[] = [];
+    for (let k = 1; k <= 2; k++) {
+      n.push(inner[(i + k) % inner.length].id);
+      n.push(inner[(i - k + inner.length) % inner.length].id);
+    }
+    neighborsOf.set(inner[i].id, n);
+  }
+
+  return { candles, local: new Float32Array(localArr), shade: new Float32Array(shadeArr), total: vox, neighborsOf };
+}
+
+// ---------------------------------------------------------------- position ---
+export type CandleStatus = 0 | 1 | 2 | 3; // orbit | event-active | swallowed | resurrected
+
+const _bounds = { startT: 0, dur: 0, epochIdx: 0 };
+
+/** Base orbital angle at warped time (pure). */
+function orbitTheta(c: VoxCandle, tW: number): number {
+  return c.phase + tW * c.angSpeed;
+}
+
+/** Full living position: orbit + 4 breathing layers + MA bounce + fate
+ *  overrides (liquidation spiral / pump comet / resurrection). Zero-alloc. */
+export function candleLivePos(
+  c: VoxCandle,
+  t: number,
+  tW: number,
+  cs: ConductorState,
+  ev: CandleEvent,
+  data: VoxData,
+  out: { x: number; y: number; z: number },
+): CandleStatus {
+  let status: CandleStatus = 0;
+  let theta = orbitTheta(c, tW);
+  // стаи (псевдо-Курамото): толпы сжимаются в эйфорию
+  theta += cs.clusterC * Math.sin(5 * (theta - 0.1 * t));
+  // кильватер кита
+  if (c.patronIdx >= 0) {
+    const w = data.candles[c.patronIdx];
+    theta += 0.06 * Math.sin(orbitTheta(w, tW) - theta);
+  }
+  // радиальный эпицикл — сердцебиение позиции
+  let r = c.orbitR * (1 + 0.045 * cs.breathAmp * Math.sin(t * c.angSpeed * 2.37 + c.phiR));
+  // отскок от скользящей средней (поддержка держит… кроме капитуляции)
+  if (cs.epoch !== 4) {
+    const Rma = c.belt === 0 ? cs.ma20R : BELT_MA_R[c.belt];
+    const dd = (r - Rma) / 5;
+    r += 6 * Math.exp(-dd * dd);
+  }
+  let yWave = BELT_WAVE_AMP[c.belt] * Math.sin(3 * theta - 0.35 * t + c.belt * 2.1);
+
+  // --- fate overrides ---
+  if (ev.type === 'liq') {
+    const tau = t - ev.tStart;
+    if (tau >= 0 && tau < ev.dur) {
+      status = 1;
+      const k = 1 - tau / ev.dur;
+      r = BLACK_HOLE.ringR + (r - BLACK_HOLE.ringR) * Math.pow(Math.max(0.001, k), 1.7);
+      theta += c.angSpeed * (ev.dur / 0.7) * (Math.pow(Math.max(0.05, k), -0.7) - 1);
+      const s = Math.min(1, tau / ev.dur);
+      yWave *= 1 - s * s * (3 - 2 * s); // smoothstep down to the donut plane
+    } else if (tau >= ev.dur && tau < ev.dur + RESURRECT_DELAY) {
+      return 2; // swallowed — the donut is digesting
+    } else if (tau >= ev.dur + RESURRECT_DELAY) {
+      // resurrection in the halo: liquidity is immortal, only traders die
+      status = 3;
+      const newR = 400 + hash01(c.id, 13) * 140;
+      theta = hash01(c.id, 17) * Math.PI * 2 + tW * (3 / newR);
+      r = newR;
+      yWave = BELT_WAVE_AMP[2] * Math.sin(3 * theta - 0.35 * t);
+    }
+  } else if (ev.type === 'comet') {
+    const tau = t - ev.tStart;
+    if (tau >= 0) {
+      status = tau < ev.dur ? 1 : 0;
+      const k = Math.min(1, tau / ev.dur);
+      r += 90 * k * k; // срыв НАРУЖУ — новая орбита выше
+      if (tau < ev.dur) yWave += 14 * Math.sin(Math.PI * (tau / ev.dur));
+    }
+  }
+
+  const x = Math.cos(theta) * r;
+  const z0 = Math.sin(theta) * r;
+  out.x = BLACK_HOLE.x + x;
+  out.y = BLACK_HOLE.y + z0 * c.incSin + yWave;
+  out.z = BLACK_HOLE.z + z0 * c.incCos;
+  return status;
+}
+
+/** Mood gain: bulls BURN in euphoria, crimson floods the cosmos in capitulation. */
+export function moodGain(bull: boolean, S: number): number {
+  return 1 + 0.3 * S * (bull ? 1 : -1);
+}
+
+/** Per-candle fate for the CURRENT epoch (cached by the renderer per epoch). */
+export function fateOf(c: VoxCandle, t: number, data: VoxData, out: CandleEvent): void {
+  epochBoundsInto(t);
+  const ev = eventFor(
+    c.id, _bounds.epochIdx, _bounds.startT, _bounds.dur,
+    (anchor: number) => {
+      if (anchor < 0) return 0;
+      const n = data.neighborsOf.get(anchor);
+      if (!n) return 0;
+      const idx = n.indexOf(c.id);
+      return idx >= 0 ? idx + 1 : 0;
+    },
+  );
+  out.type = ev.type;
+  out.tStart = ev.tStart;
+  out.dur = ev.dur;
+}
+
+function epochBoundsInto(t: number) {
+  const b = epochBounds(t);
+  _bounds.startT = b.startT;
+  _bounds.dur = b.dur;
+  _bounds.epochIdx = b.epochIdx;
+}
+
+export { warpTime, conductorState };
+
+// legacy shim (Dragons/others import BLACK_HOLE; old callers of candleBasePos)
+export function candleBasePos(c: VoxCandle, t: number, out: { x: number; y: number; z: number }) {
+  const th = c.phase + t * c.angSpeed;
+  const x = Math.cos(th) * c.orbitR;
+  const z0 = Math.sin(th) * c.orbitR;
+  out.x = BLACK_HOLE.x + x;
+  out.y = BLACK_HOLE.y + z0 * c.incSin;
+  out.z = BLACK_HOLE.z + z0 * c.incCos;
 }
 
 /** Debris chunks for a carved voxel (called by the renderer). */
@@ -139,7 +265,6 @@ export function voxDebris(
   hitX: number, hitY: number, hitZ: number,
   color: string,
 ): Omit<DebrisChunk, 'id' | 'createdAt'> {
-  // fly away from the hit point + up, with spin
   let dx = x - hitX, dy = y - hitY, dz = z - hitZ;
   const len = Math.hypot(dx, dy, dz) || 1;
   const kick = 6 + Math.random() * 8;
