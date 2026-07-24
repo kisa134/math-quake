@@ -26,8 +26,8 @@ export interface DragonDef {
 }
 
 export const DRAGONS: DragonDef[] = [
-  // hidden on the skull planet's shoulder
-  { id: 0, name: 'BONE WYRM',   scale: 1,   hp: 420,  speed: 38, home: [190, 168, -170], circleR: 34, circleSpeed: 0.22, phase: 0.4 },
+  // circles RIGHT OVER the spawn temple — you see your first dragon in second one
+  { id: 0, name: 'BONE WYRM',   scale: 1,   hp: 420,  speed: 38, home: [0, 106, 0], circleR: 38, circleSpeed: 0.25, phase: 0.4 },
   // circling a mid-city rooftop cluster
   { id: 1, name: 'GLITCH DRAKE', scale: 1,  hp: 420,  speed: 38, home: [-280, 300, 210], circleR: 46, circleSpeed: 0.18, phase: 2.2 },
   // deep in the outer halo — the far hunter

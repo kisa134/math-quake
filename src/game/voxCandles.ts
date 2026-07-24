@@ -24,8 +24,10 @@ export interface VoxCandle {
   incCos: number;
 }
 
-/** The all-consuming donut sits here; orbits center on it. */
-export const BLACK_HOLE = { x: 0, y: 300, z: 0, ringR: 110, tubeR: 34 };
+/** The all-consuming donut sits here; orbits center on it.
+ *  V4.2 visibility pass: lowered 300→235 — it LOOMS over the arena now,
+ *  the candle universe wheels straight over your head at spawn. */
+export const BLACK_HOLE = { x: 0, y: 235, z: 0, ringR: 110, tubeR: 34 };
 
 /** Analytic orbital base position of a candle at time t (zero-alloc via out). */
 export function candleBasePos(c: VoxCandle, t: number, out: { x: number; y: number; z: number }) {

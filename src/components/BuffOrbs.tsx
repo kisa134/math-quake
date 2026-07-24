@@ -63,7 +63,7 @@ export const BuffOrbs = () => {
       {orbs.map((o) => (
         <group key={o.id} ref={(g) => { if (g) groupRefs.current.set(o.id, g); else groupRefs.current.delete(o.id); }} position={[o.x, o.y, o.z]}>
           <mesh>
-            <octahedronGeometry args={[0.55, 0]} />
+            <octahedronGeometry args={[0.85, 0]} />
             <meshStandardMaterial
               color={ORB_COLORS[o.type]}
               emissive={ORB_COLORS[o.type]}

@@ -46,7 +46,8 @@ export function spawnBotWave(count: number, round: number) { _spawn?.(count, rou
 export function aliveBotCount() { return _aliveCount; }
 
 const SPAWN_ANCHORS: [number, number, number][] = [
-  [0, 84, 0], [200, 24, 200], [-200, 24, 200], [200, 24, -200], [-200, 24, -200],
+  [0, 84, 0], [18, 86, 18], [-20, 86, 10], // V4.2: мясо приходит К ТЕБЕ на спавн-храм
+  [200, 24, 200], [-200, 24, 200], [200, 24, -200], [-200, 24, -200],
 ];
 
 /** Write one bot's 6 part matrices + proxy + color. */
@@ -143,14 +144,14 @@ export const BotHorde = () => {
   }, []);
 
   const killBot = (b: Bot, slot: number) => {
-    // FULL voxel shatter — the whole dude explodes into bone/blood/organs
-    useStore.getState().addDebris(makeGore(b.x, b.y + b.scale, b.z, 28, 9));
-    addTrauma(0.15);
+    // FULL voxel shatter — the whole dude explodes into bone/blood/organs (V4.2: fatter)
+    useStore.getState().addDebris(makeGore(b.x, b.y + b.scale, b.z, 40, 11));
+    addTrauma(0.2);
     playExplosionSound();
     // close-range kill → red HUD flash (the brutality register)
-    if (camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z)) < 12 * 12) fireKillFlash();
-    // dopamine: 14% chance the corpse drops a buff orb (personal loot)
-    if (Math.random() < 0.14) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
+    if (camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z)) < 16 * 16) fireKillFlash();
+    // dopamine: 22% chance the corpse drops a buff orb (personal loot)
+    if (Math.random() < 0.22) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
     slotOf.current.delete(b.id);
