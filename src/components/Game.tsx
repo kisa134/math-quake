@@ -28,7 +28,7 @@ const GameManager = () => {
     if (!isPlaying || !isHost) return;
 
     for (let i = 0; i < 5; i++) spawnEnemy();
-    const interval = setInterval(() => spawnEnemy(), 1400);
+    const interval = setInterval(() => spawnEnemy(), 1800);
     return () => clearInterval(interval);
   }, [isPlaying, isHost, spawnEnemy]);
 

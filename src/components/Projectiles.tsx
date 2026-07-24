@@ -238,10 +238,13 @@ const Projectile = ({ id, position, velocity, fromPlayer, createdAt, kind, color
       }
     }
 
-    // Collision with environment + enemies (forward raycast)
+    // Collision with environment + enemies (forward raycast). far is clamped to
+    // this frame's travel so bounding-sphere tests cull almost everything — a
+    // full-scene unbounded raycast per projectile per frame was an FPS killer.
     _projDir.copy(vel.current).normalize();
     raycaster.current.set(pos.current, _projDir);
     const distNextFrame = vel.current.length() * delta;
+    raycaster.current.far = distNextFrame + 0.6;
     const hits = raycaster.current.intersectObjects(scene.children, true);
 
     for (const hit of hits) {

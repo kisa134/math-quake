@@ -17,14 +17,14 @@ import * as THREE from 'three';
  */
 export const MOVE = {
   // --- ground ---
-  maxGroundSpeed: 26,   // top speed under your own steam on the ground
-  groundAccel: 120,     // how hard we reach maxGroundSpeed
+  maxGroundSpeed: 30,   // top speed under your own steam on the ground (V2 feel pass: 26→30)
+  groundAccel: 135,     // how hard we reach maxGroundSpeed (snappier starts)
   friction: 8,          // ground deceleration when not accelerating
   stopSpeed: 4,         // floor for friction so slow speeds still stop crisply
 
   // --- air (the strafe-jump engine) ---
-  airAccel: 140,        // air acceleration coefficient
-  airAccelCap: 3,       // the low wish-speed cap that enables strafe speed-gain
+  airAccel: 150,        // air acceleration coefficient
+  airAccelCap: 3.5,     // the low wish-speed cap that enables strafe speed-gain
                         // (kept small on purpose — this IS the Quake magic)
 
   // --- jumping ---
@@ -34,19 +34,19 @@ export const MOVE = {
   bufferMs: 130,        // press-jump-slightly-early window (feels responsive)
 
   // --- safety ---
-  hardSpeedCap: 95,     // absolute horizontal speed clamp so bhop can't runaway
+  hardSpeedCap: 125,    // absolute horizontal speed clamp (raised for km-city flings)
 
   // --- jetpack (double-tap space) ---
-  jetThrust: 55,        // upward acceleration while thrusting (units/s^2)
-  jetMaxUp: 13,         // cap on upward velocity from the jetpack
+  jetThrust: 62,        // upward acceleration while thrusting (units/s^2)
+  jetMaxUp: 15,         // cap on upward velocity from the jetpack
   jetFuelMax: 100,
   jetDrain: 45,         // fuel per second while thrusting
   jetRegen: 24,         // fuel per second when grounded (×0.3 in the air)
   doubleTapMs: 300,     // window for the second Space tap to engage the pack
 
   // --- grappling hook (right mouse) ---
-  grapplePull: 65,      // acceleration toward the anchor while reeling
-  grappleRange: 140,    // max distance the hook can latch
+  grapplePull: 85,      // acceleration toward the anchor while reeling (harder yank)
+  grappleRange: 280,    // max latch distance — city-scale, skyscrapers in reach
   grappleRelease: 4,    // auto-detach when this close to the anchor
 };
 

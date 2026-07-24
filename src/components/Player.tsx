@@ -16,6 +16,7 @@ import { getSpell } from '../config/spells';
 import { CharacterModel } from './CharacterModel';
 import { trainVelocity } from './Train';
 import { carPositions, tryToggleCar } from './Cars';
+import { grappleCityHits } from './Cityscape';
 import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
 
@@ -248,6 +249,13 @@ export const Player = () => {
       camera.position.addScaledVector(_recoilVec, -recoilAmt.current * 0.5);
       camera.position.y += recoilAmt.current * 0.2;
       recoilAmt.current = Math.max(0, recoilAmt.current - delta * 9);
+      // AAA FOV punch: a few degrees of kick that springs back with the recoil.
+      const pc = camera as THREE.PerspectiveCamera;
+      pc.fov = 80 + recoilAmt.current * 5;
+      pc.updateProjectionMatrix();
+    } else {
+      const pc = camera as THREE.PerspectiveCamera;
+      if (pc.fov !== 80) { pc.fov = 80; pc.updateProjectionMatrix(); }
     }
 
     if (weaponRef.current) {
@@ -409,20 +417,33 @@ export const Player = () => {
     if (editorMode) grappleOn.current = false; // RMB deletes props in build mode
     if (!editorMode && keys.grapple && !prevGrapple.current) {
       raycaster.current.setFromCamera(_center2, camera);
+      raycaster.current.far = MOVE.grappleRange;
       const hits = raycaster.current.intersectObjects(scene.children, true);
+      let anchorDist = Infinity;
       for (const h of hits) {
         const ud = h.object.userData;
         let o: THREE.Object3D | null = h.object;
         let isEnemy = false;
         while (o) { if (o.userData?.isEnemy) { isEnemy = true; break; } o = o.parent; }
-        if (ud?.isWall || ud?.isFloor || ud?.isJumpPad || isEnemy) {
+        if (ud?.isWall || ud?.isFloor || ud?.isJumpPad || ud?.isCreature || isEnemy) {
           if (h.distance <= MOVE.grappleRange) {
             grappleAnchor.current.copy(h.point);
-            grappleOn.current = true;
-            playShootSound(150, 0.09);
+            anchorDist = h.distance;
           }
           break;
         }
+      }
+      // Grapple ANYTHING: the instanced skyscrapers are raycast-noop for the
+      // per-frame probes, but a click may test them explicitly — closest wins.
+      const cityHits = grappleCityHits(raycaster.current);
+      if (cityHits.length && cityHits[0].distance <= MOVE.grappleRange && cityHits[0].distance < anchorDist) {
+        grappleAnchor.current.copy(cityHits[0].point);
+        anchorDist = cityHits[0].distance;
+      }
+      raycaster.current.far = Infinity;
+      if (anchorDist < Infinity) {
+        grappleOn.current = true;
+        playShootSound(150, 0.09);
       }
     }
     prevGrapple.current = keys.grapple;

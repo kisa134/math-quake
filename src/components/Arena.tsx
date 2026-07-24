@@ -17,7 +17,17 @@ const mulberry32 = (seed: number) => {
   };
 };
 
+const NO_RAYCAST = () => {};
+
 export const Arena = () => {
+  // Sky/backdrop layer (rain shell, 10k star points, infinite grid) must NEVER
+  // be raycast — the per-frame ground-probe and projectile rays were paying a
+  // 10k-point sphere test on Stars alone. Visual only.
+  const skyRef = React.useRef<THREE.Group>(null);
+  React.useEffect(() => {
+    skyRef.current?.traverse((o) => { o.raycast = NO_RAYCAST; });
+  }, []);
+
   // Seeded candlestick platforms connecting temples (no Math.random at render)
   const candlesticks = React.useMemo(() => {
     const rnd = mulberry32(0xa11ce);
@@ -51,9 +61,12 @@ export const Arena = () => {
 
   return (
     <group>
-      <MatrixRain />
-      <Stars radius={300} depth={100} count={10000} factor={4} saturation={1} fade speed={1.5} />
-      
+      <group ref={skyRef}>
+        <MatrixRain />
+        <Stars radius={300} depth={100} count={10000} factor={4} saturation={1} fade speed={1.5} />
+        <Grid infiniteGrid fadeDistance={400} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
+      </group>
+
       {/* Massive Void Floor - basically a kill plane visual */}
       <RigidBody type="fixed">
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -50, 0]} receiveShadow userData={{ isFloor: true }}>
@@ -62,8 +75,6 @@ export const Arena = () => {
         </mesh>
       </RigidBody>
       
-      <Grid infiniteGrid fadeDistance={400} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
-
       {/* Central High Temple */}
       <Temple position={[0, 80, 0]} size={60} color="#f72585" name="CORE_EXCHANGE" />
       <JumpPad position={[0, -48, 0]} force={150} /> {/* Giant center jump pad from bottom */}

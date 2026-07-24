@@ -63,24 +63,50 @@ export const playHitTick = () => {
   osc.stop(t + 0.06);
 };
 
+// Layered AAA-ish shot: the classic square zap + a sub-bass thump underneath
+// (the thump is what makes a gun feel heavy) + a 10ms noise click transient.
 export const playShootSound = (freq = 400, dur = 0.1) => {
   if (!audioCtx) return;
-  
+  const t = audioCtx.currentTime;
+
+  // layer 1 — the zap (original)
   const osc = audioCtx.createOscillator();
   const gain = audioCtx.createGain();
-  
   osc.connect(gain);
   gain.connect(audioCtx.destination);
-  
   osc.type = 'square';
-  osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
-  osc.frequency.exponentialRampToValueAtTime(freq / 4, audioCtx.currentTime + dur);
-  
-  gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + dur);
-  
-  osc.start();
-  osc.stop(audioCtx.currentTime + dur);
+  osc.frequency.setValueAtTime(freq, t);
+  osc.frequency.exponentialRampToValueAtTime(freq / 4, t + dur);
+  gain.gain.setValueAtTime(0.1, t);
+  gain.gain.exponentialRampToValueAtTime(0.01, t + dur);
+  osc.start(t);
+  osc.stop(t + dur);
+
+  // layer 2 — sub thump (weight)
+  const sub = audioCtx.createOscillator();
+  const sg = audioCtx.createGain();
+  sub.type = 'sine';
+  sub.frequency.setValueAtTime(110, t);
+  sub.frequency.exponentialRampToValueAtTime(38, t + 0.09);
+  sg.gain.setValueAtTime(0.16, t);
+  sg.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+  sub.connect(sg);
+  sg.connect(audioCtx.destination);
+  sub.start(t);
+  sub.stop(t + 0.11);
+
+  // layer 3 — click transient (crack)
+  const len = Math.floor(audioCtx.sampleRate * 0.012);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const click = audioCtx.createBufferSource();
+  click.buffer = buf;
+  const cg = audioCtx.createGain();
+  cg.gain.setValueAtTime(0.12, t);
+  click.connect(cg);
+  cg.connect(audioCtx.destination);
+  click.start(t);
 };
 
 // Short noisy crunch for a small enemy shattering into voxels.

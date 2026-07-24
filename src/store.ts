@@ -208,7 +208,7 @@ export const useStore = create<GameState>((set) => ({
   
   spawnEnemy: () => set((state) => {
     if (!state.isPlaying) return state;
-    if (state.enemies.length >= 40) return state; // Max 40 enemies
+    if (state.enemies.length >= 24) return state; // Max 24 (40 tanked fps — dynamic bodies are the CPU cost)
     
     const isCandle = Math.random() > 0.8;
     const type = isCandle ? 'candle' : SHAPES[Math.floor(Math.random() * (SHAPES.length - 1))];

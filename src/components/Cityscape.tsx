@@ -29,6 +29,17 @@ const DUMMY = new THREE.Object3D();
 const COLOR = new THREE.Color();
 const NO_RAYCAST = () => {};
 
+// Grapple-anything support: the tower bodies are raycast-noop for the per-frame
+// probes (perf), but the grapple fires ONCE per click — so it may raycast the
+// 430 instanced tower boxes explicitly through this hook. Player.tsx calls it.
+let _towersMesh: THREE.InstancedMesh | null = null;
+export function grappleCityHits(ray: THREE.Raycaster): THREE.Intersection[] {
+  if (!_towersMesh) return [];
+  const out: THREE.Intersection[] = [];
+  THREE.InstancedMesh.prototype.raycast.call(_towersMesh, ray, out);
+  return out;
+}
+
 /** Fill an InstancedMesh from descriptors once (static visual layer). */
 function useStaticInstances(list: Inst[], dynamic = false) {
   const ref = useRef<THREE.InstancedMesh>(null);
@@ -120,12 +131,14 @@ export const Cityscape = () => {
   const candleGeo = useMemo(() => makeCandleGeometry(), []);
 
   const towersRef = useStaticInstances(city.towers);
+  useEffect(() => { _towersMesh = towersRef.current; return () => { _towersMesh = null; }; }, [towersRef]);
   const stripsRef = useStaticInstances(city.strips);
   const roofsRef = useStaticInstances(city.roofs);
   const bullsRef = useStaticInstances(city.bulls, true);
   const bearsRef = useStaticInstances(city.bears, true);
 
   const planetRefs = useRef<Array<THREE.Group | null>>([]);
+  const planetPatched = useRef<boolean[]>([]);
   const frame = useRef(0);
 
   // Dev perf helper: window.__perf() → { calls, tris }
@@ -153,6 +166,21 @@ export const Cityscape = () => {
       const p = city.planets[i];
       g.rotation.y += p.spin * dt;
       g.position.y = p.pos[1] + Math.sin(t * 0.11 + i * 1.7) * 4; // slow bob
+
+      // One-time: once the Suspense-loaded GLB meshes exist, silence their
+      // triangle-level raycast (tens of thousands of tris tested by the
+      // per-frame ground probe = the V2 fps sink). The invisible proxy sphere
+      // (added below, named 'proxy') stays raycastable for grapple/standing.
+      if (!planetPatched.current[i]) {
+        let found = false;
+        g.traverse((o) => {
+          if ((o as THREE.Mesh).isMesh && o.name !== 'planet-proxy') {
+            o.raycast = NO_RAYCAST;
+            found = true;
+          }
+        });
+        if (found) planetPatched.current[i] = true;
+      }
     }
   });
 
@@ -196,6 +224,11 @@ export const Cityscape = () => {
           scale={p.scale}
         >
           <AssetModel assetId={p.assetId} />
+          {/* invisible raycast proxy — grapple/probe hit a cheap sphere, not
+              the GLB's tens of thousands of triangles */}
+          <mesh name="planet-proxy" visible={false} userData={tag({ isWall: true, isFloor: true })}>
+            <sphereGeometry args={[0.55, 12, 12]} />
+          </mesh>
         </group>
       ))}
     </group>
