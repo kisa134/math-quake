@@ -10,6 +10,7 @@ import * as THREE from 'three';
  */
 export interface HitTag {
   isEnemy?: boolean;
+  isCreature?: boolean; // neutral critter (WS-E): damageable via damageCreature, tameable via T
   isPlayer?: boolean;
   isFloor?: boolean;
   isWall?: boolean;
@@ -23,7 +24,7 @@ export interface HitTag {
 /** Typed factory for `userData` (identity at runtime, checked at compile time). */
 export const tag = (t: HitTag): HitTag => t;
 
-const TAGGED = ['isEnemy', 'isPlayer', 'isFloor', 'isWall', 'isJumpPad'] as const;
+const TAGGED = ['isEnemy', 'isCreature', 'isPlayer', 'isFloor', 'isWall', 'isJumpPad'] as const;
 
 /** Nearest ancestor (incl. self) carrying any HitTag flag, or null. */
 export function findTag(o: THREE.Object3D | null): { obj: THREE.Object3D; tag: HitTag } | null {

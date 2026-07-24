@@ -5,33 +5,49 @@ import * as THREE from 'three';
 import { MatrixRain } from './MatrixRain';
 import { PALETTE } from '../theme';
 
-export const Arena = () => {
-  // Generate random candlestick platforms connecting temples
-  const candlesticks = [];
-  const addCandles = (startX: number, startZ: number, endX: number, endZ: number, count: number) => {
-    for (let i = 1; i <= count; i++) {
-      const t = i / (count + 1);
-      const x = startX + (endX - startX) * t + (Math.random() - 0.5) * 20;
-      const z = startZ + (endZ - startZ) * t + (Math.random() - 0.5) * 20;
-      const height = 10 + Math.random() * 30 + (1 - Math.abs(t - 0.5) * 2) * 20;
-      const width = 4 + Math.random() * 6;
-      const isGreen = Math.random() > 0.5;
-      candlesticks.push(
-        <Candlestick key={`candle-${startX}_${startZ}-to-${endX}_${endZ}-${i}`} position={[x, height / 2, z]} height={height} width={width} isGreen={isGreen} />
-      );
-    }
+/** Deterministic PRNG (mulberry32) — same seed → identical candlestick paths
+ *  on every client (physics platforms MUST match across the network). */
+const mulberry32 = (seed: number) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+};
 
-  // Paths from outer to center
-  addCandles(-200, -200, 0, 0, 15);
-  addCandles(200, -200, 0, 0, 15);
-  addCandles(-200, 200, 0, 0, 15);
-  addCandles(200, 200, 0, 0, 15);
-  // Paths between outer temples
-  addCandles(-200, -200, 200, -200, 10);
-  addCandles(200, -200, 200, 200, 10);
-  addCandles(200, 200, -200, 200, 10);
-  addCandles(-200, 200, -200, -200, 10);
+export const Arena = () => {
+  // Seeded candlestick platforms connecting temples (no Math.random at render)
+  const candlesticks = React.useMemo(() => {
+    const rnd = mulberry32(0xa11ce);
+    const out: React.ReactElement[] = [];
+    const addCandles = (startX: number, startZ: number, endX: number, endZ: number, count: number) => {
+      for (let i = 1; i <= count; i++) {
+        const t = i / (count + 1);
+        const x = startX + (endX - startX) * t + (rnd() - 0.5) * 20;
+        const z = startZ + (endZ - startZ) * t + (rnd() - 0.5) * 20;
+        const height = 10 + rnd() * 30 + (1 - Math.abs(t - 0.5) * 2) * 20;
+        const width = 4 + rnd() * 6;
+        const isGreen = rnd() > 0.5;
+        out.push(
+          <Candlestick key={`candle-${startX}_${startZ}-to-${endX}_${endZ}-${i}`} position={[x, height / 2, z]} height={height} width={width} isGreen={isGreen} />
+        );
+      }
+    };
+
+    // Paths from outer to center
+    addCandles(-200, -200, 0, 0, 15);
+    addCandles(200, -200, 0, 0, 15);
+    addCandles(-200, 200, 0, 0, 15);
+    addCandles(200, 200, 0, 0, 15);
+    // Paths between outer temples
+    addCandles(-200, -200, 200, -200, 10);
+    addCandles(200, -200, 200, 200, 10);
+    addCandles(200, 200, -200, 200, 10);
+    addCandles(-200, 200, -200, -200, 10);
+    return out;
+  }, []);
 
   return (
     <group>

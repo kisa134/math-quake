@@ -7,12 +7,19 @@ import { weaponTune } from '../game/weaponTune';
 import { onFire } from '../game/fx';
 
 /**
- * First-person 3D weapon viewmodel. Loads the Synty FBX for the active weapon
- * (cached by useLoader), re-shades every mesh to a neon emissive tint matching
- * the weapon's tracer color so it catches Bloom and reads in the matrix world.
- * Held pose comes from weaponTune (live-tunable); a per-shot punch (driven by
- * the fx fire event) kicks it back + twists. Rendered inside Player's weaponRef
- * group, which handles camera-follow + sway.
+ * First-person 3D weapon viewmodel — V2.
+ *
+ * VISIBILITY IS SYSTEMIC: after loading + cloning the Synty FBX we measure its
+ * Box3, uniformly scale so the longest dimension equals spec.vLen, and recenter
+ * the geometry on the origin. The tune pose then only supplies pos/rot plus a
+ * scale MULTIPLIER (default 1). A weapon can never be microscopic or off-screen
+ * because of FBX units again.
+ *
+ * JUICE: every mesh is re-shaded to a neon emissive tint (catches Bloom), a
+ * colored <pointLight> inside the weapon group washes the hands/walls in the
+ * weapon's tracer color (pulses +50% on fire, decays with the punch), and each
+ * weapon class has a procedural fire animation (clock+punch driven, zero-alloc):
+ * slash / pump / thrust / swing.
  */
 export const WeaponModel = ({ weapon }: { weapon: number }) => {
   const spec = WEAPONS[weapon] ?? WEAPONS[0];
@@ -37,10 +44,26 @@ export const WeaponModel = ({ weapon }: { weapon: number }) => {
         mesh.receiveShadow = false;
       }
     });
-    return clone;
-  }, [fbx, spec.tracer]);
+    // ── Systemic bbox normalization (same pattern as CharacterModel) ─────────
+    // Longest dimension → spec.vLen, geometry centered on the origin. The tune
+    // pose is applied to the OUTER group, so pose numbers are always in sane,
+    // human-scale view units no matter what the FBX was authored in.
+    const box = new THREE.Box3().setFromObject(clone);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const k = spec.vLen / maxDim;
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    const holder = new THREE.Group();
+    clone.scale.setScalar(k);
+    clone.position.set(-center.x * k, -center.y * k, -center.z * k);
+    holder.add(clone);
+    return holder;
+  }, [fbx, spec]);
 
   const ref = useRef<THREE.Group>(null);
+  const lightRef = useRef<THREE.PointLight>(null);
   const punch = useRef(0);
   const clock = useRef(0);
 
@@ -52,25 +75,67 @@ export const WeaponModel = ({ weapon }: { weapon: number }) => {
     const g = ref.current;
     if (t && g) {
       const p = punch.current;
-      // Juicy recoil: snap back toward camera + up, twist (roll) and yaw a touch,
-      // plus a subtle idle breathing bob so the viewmodel feels alive at rest.
+      // 0→1→0 arc over the punch decay — turns the linear decay into a sweep
+      // that goes OUT and comes BACK (the soul of a slash/pump/swing).
+      const arc = Math.sin(Math.min(1, p) * Math.PI);
+      // Idle breathing bob so the viewmodel feels alive at rest.
       const bobY = Math.sin(clock.current * 1.6) * 0.006;
       const bobX = Math.cos(clock.current * 1.1) * 0.004;
-      g.position.set(
-        t.pos[0] + bobX + p * 0.02,
-        t.pos[1] + bobY + p * 0.05,
-        t.pos[2] + p * 0.16, // kick toward camera
-      );
-      g.rotation.set(
-        t.rot[0] - p * 0.32,        // muzzle rises
-        t.rot[1] + p * 0.10,        // slight yaw flick
-        t.rot[2] + p * 0.18,        // roll twist
-      );
-      g.scale.setScalar(t.scale);
+
+      // ── Procedural fire animation per weapon class (zero-alloc) ────────────
+      let px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0;
+      switch (spec.anim) {
+        case 'slash': // dagger: quick diagonal cut — roll sweep + forward jab
+          rz = -arc * 0.9;
+          rx = -arc * 0.25;
+          pz = -arc * 0.22; // jab TOWARD the target, not away
+          py = -arc * 0.04;
+          break;
+        case 'pump': // shotgun: kick back, then rack the pump forward
+          pz = p * 0.2 - arc * 0.06;
+          rx = -p * 0.38; // muzzle rises hard
+          py = p * 0.03;
+          break;
+        case 'thrust': // wand/staff: sharp forward thrust + tip flick
+          pz = -arc * 0.18;
+          rx = arc * 0.15;
+          ry = arc * 0.08;
+          break;
+        case 'swing': // heavy blade: big lateral arc with body behind it
+          rz = -arc * 1.2;
+          rx = -arc * 0.5;
+          px = arc * 0.08;
+          pz = -arc * 0.1;
+          py = -arc * 0.06;
+          break;
+      }
+
+      g.position.set(t.pos[0] + bobX + px, t.pos[1] + bobY + py, t.pos[2] + pz);
+      g.rotation.set(t.rot[0] + rx, t.rot[1] + ry, t.rot[2] + rz);
+      g.scale.setScalar(t.scale); // multiplier on the vLen-normalized model
+
+      // ── Colored glow: idle shimmer + fire flare (decays with the punch) ────
+      const light = lightRef.current;
+      if (light) {
+        light.intensity = 2.5 * (1 + 0.08 * Math.sin(clock.current * 3)) + p * 2.2;
+      }
     }
     // Snappy attack already applied on the fire event; fast spring-back out.
     punch.current = Math.max(0, punch.current - delta * 8);
   });
 
-  return <primitive ref={ref} object={model} />;
+  return (
+    <group ref={ref}>
+      <primitive object={model} />
+      {/* Weapon-colored light: washes the "hands"/nearby walls in tracer color */}
+      <pointLight
+        ref={lightRef}
+        color={spec.tracer}
+        intensity={2.5}
+        distance={4}
+        decay={2}
+        position={[0, 0.06, -0.12]}
+      />
+    </group>
+  );
 };

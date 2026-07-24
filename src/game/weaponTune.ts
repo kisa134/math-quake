@@ -2,15 +2,19 @@ import { WEAPONS } from '../config/weapons';
 
 /**
  * Live-tunable held-pose for each weapon viewmodel. Seeded from the config
- * defaults; WeaponModel reads it every frame so changes apply instantly. Since
- * the browser preview is headless here (owner is the eyes), expose a console
- * helper so the poses can be dialed in live, then baked back into weapons.ts:
+ * defaults; WeaponModel reads it every frame so changes apply instantly.
  *
- *   __wpn.set(0, { scale: 0.008, pos: [0.35,-0.4,-0.6], rot: [0.2,0.1,0] })
+ * V2: `scale` is a MULTIPLIER (default 1) on top of WeaponModel's systemic
+ * bbox normalization (model's longest dimension = spec.vLen). So scale 1 is
+ * always visible/correct; tune it in the 0.7–1.5 range, never 0.006 again.
+ * Since the browser preview is headless here (owner is the eyes), a console
+ * helper lets the poses be dialed in live, then baked back into weapons.ts:
+ *
+ *   __wpn.set(0, { scale: 1.1, pos: [0.35,-0.4,-0.6], rot: [0.2,0.1,0] })
  *   __wpn.all()   // copy the numbers back to me
  */
 export interface WeaponTune {
-  scale: number;
+  scale: number; // multiplier on the vLen-normalized model
   pos: [number, number, number];
   rot: [number, number, number];
 }

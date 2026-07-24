@@ -56,7 +56,7 @@ export const MatrixRain = () => {
 
   return (
     <mesh renderOrder={-10}>
-      <cylinderGeometry args={[600, 600, 700, 64, 1, true]} />
+      <cylinderGeometry args={[1300, 1300, 1600, 64, 1, true]} />
       <shaderMaterial
         ref={matRef}
         vertexShader={vertexShader}

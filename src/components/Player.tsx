@@ -11,9 +11,13 @@ import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
 import { WEAPONS } from '../config/weapons';
 import { WeaponModel } from './WeaponModel';
-import { ASSET_IDS } from '../config/assets';
+import { BUILD_IDS } from '../config/assets';
 import { getSpell } from '../config/spells';
 import { CharacterModel } from './CharacterModel';
+import { trainVelocity } from './Train';
+import { carPositions, tryToggleCar } from './Cars';
+import { tryTame, damageCreature } from './Creatures';
+import { makeFlames } from '../game/voxel';
 
 const JUMP_FORCE = 15;
 
@@ -28,6 +32,7 @@ const _recoilVec = new THREE.Vector3();
 const _center2 = new THREE.Vector2(0, 0);
 const _grappleVec = new THREE.Vector3();
 const _ropeStart = new THREE.Vector3();
+const _camTarget = new THREE.Vector3();
 
 // WS-4 magnetic-boots probe (short lateral + up rays; reused each frame)
 const _bootRaycaster = new THREE.Raycaster();
@@ -108,10 +113,33 @@ export const Player = () => {
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
+      if (e.code === 'KeyT') {
+        // Universal interact: car enter/exit first (WS-B), else tame (WS-E).
+        const body = playerRef.current;
+        const wasDriving = st.driving;
+        const p = body ? body.translation() : null;
+        if (p && tryToggleCar(p.x, p.y, p.z)) {
+          if (wasDriving && body) {
+            // exited → pop the body out beside the car so capsules don't overlap
+            const car = carPositions[wasDriving];
+            if (car) {
+              body.setTranslation({
+                x: car.x + Math.cos(car.heading) * 2.5,
+                y: car.y + 2,
+                z: car.z - Math.sin(car.heading) * 2.5,
+              }, true);
+              body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            }
+          }
+          return;
+        }
+        tryTame(camera, scene);
+        return;
+      }
       if (st.editorMode) {
         // Digits jump to an asset by index; scroll cycles (Editor.tsx owns it).
         const m = e.code.match(/^Digit([1-9])$/);
-        if (m) { const i = +m[1] - 1; if (i < ASSET_IDS.length) st.setEditorSelect(ASSET_IDS[i]); }
+        if (m) { const i = +m[1] - 1; if (i < BUILD_IDS.length) st.setEditorSelect(BUILD_IDS[i]); }
       } else if (!st.spellWheelOpen) {
         // While the spell wheel is open, digits pick spell slices (SpellWheel owns that).
         const m = e.code.match(/^Digit([1-9])$/);
@@ -158,6 +186,35 @@ export const Player = () => {
     // In build/editor mode, LMB/RMB place & delete props (see Editor.tsx), so
     // weapons and the grapple are suppressed this frame.
     const editorMode = useStore.getState().editorMode;
+
+    // ---- V2 WS-B: drive mode. Player is pinned into the car; chase cam; all
+    // on-foot movement / shooting / grapple skipped this frame. ----
+    const drivingId = useStore.getState().driving;
+    if (drivingId) {
+      const car = carPositions[drivingId];
+      if (car) {
+        // seat the body in the car (2.0 up so the capsule clears the car collider)
+        playerRef.current.setTranslation({ x: car.x, y: car.y + 2.0, z: car.z }, true);
+        playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        if (weaponRef.current) weaponRef.current.visible = false;
+        // chase cam: 8 back along heading, 3 up, lerped (forward = (sin h, 0, cos h))
+        _camTarget.set(car.x - Math.sin(car.heading) * 8, car.y + 3, car.z - Math.cos(car.heading) * 8);
+        camera.position.lerp(_camTarget, Math.min(1, delta * 8));
+        camera.lookAt(car.x, car.y + 1, car.z);
+        // minimal net sync — the driver's own 'update' carries their position
+        const tSync = performance.now();
+        if (roomId && tSync - lastSyncTime.current > 50) {
+          lastSyncTime.current = tSync;
+          socket.emit('update', {
+            x: car.x, y: car.y + 2.0, z: car.z,
+            rotation: car.heading, isShooting: false, currentWeapon,
+            minions: useStore.getState().localMinions,
+            avatar: useStore.getState().avatarId,
+          });
+        }
+      }
+      return; // skip everything on-foot
+    }
 
     // Movement
     const velocity = playerRef.current.linvel();
@@ -214,6 +271,7 @@ export const Player = () => {
     let customJumpForce = JUMP_FORCE * 1.8;
     let groundFriction = MOVE.friction; // WS-4: per-surface friction (ice = low)
     let groundIsMetal = false;          // WS-4: down-probe hit a magnetic surface
+    let onTrain = false;                // WS-B: standing on the moving train
     for (const dHit of downHits) {
       const ud = dHit.object.userData;
       if (ud?.isJumpPad) {
@@ -226,6 +284,7 @@ export const Player = () => {
         grounded = true;
         groundFriction = ud.friction ?? MOVE.friction;
         groundIsMetal = !!ud.isMetal;
+        onTrain = ud.id === 'train';
         break;
       }
     }
@@ -280,6 +339,8 @@ export const Player = () => {
     const jumpBuffered = tNow - lastJumpPressed.current <= MOVE.bufferMs;
 
     _moveVel.set(velocity.x, 0, velocity.z);
+    // WS-B: work in train-local space so friction doesn't fight the carrier
+    if (onTrain) { _moveVel.x -= trainVelocity.x; _moveVel.z -= trainVelocity.z; }
     let newY = velocity.y;
     let didJump = false;
 
@@ -398,6 +459,13 @@ export const Player = () => {
       }
     }
 
+    // WS-B: ride the train — add carrier velocity back so you move WITH the roof
+    if (onTrain) {
+      _moveVel.x += trainVelocity.x;
+      _moveVel.z += trainVelocity.z;
+      if (!didJump) newY = trainVelocity.y + Math.min(0, newY); // glued on climbs/dives
+    }
+
     playerRef.current.setLinvel({ x: _moveVel.x, y: newY, z: _moveVel.z }, true);
 
     // Weapon sway
@@ -475,6 +543,10 @@ export const Player = () => {
           for (const hitObj of intersects) {
             let obj: THREE.Object3D | null = hitObj.object; let isHit = false;
             while (obj) {
+              if (obj.userData?.isCreature) {
+                damageCreature(obj.userData.id, spell.damage);
+                anyHit = true; isHit = true; break;
+              }
               if (obj.userData?.isEnemy) {
                 const eid = obj.userData.id;
                 const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
@@ -570,6 +642,10 @@ export const Player = () => {
             let obj: THREE.Object3D | null = hitObj.object;
             let isHit = false;
             while (obj) {
+              if (obj.userData?.isCreature) {
+                damageCreature(obj.userData.id, config.damage);
+                anyEnemyHit = true; isHit = true; hitEnemy = true; break;
+              }
               if (obj.userData?.isEnemy) {
                 if (obj.userData?.isPlayer) {
                   targetId = obj.userData.id;
@@ -593,6 +669,11 @@ export const Player = () => {
             }
             if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
               _endPoint.copy(hitObj.point);
+
+              // Pixel-fire burn at the impact point, in the weapon's muzzle color.
+              useStore.getState().addDebris(
+                makeFlames([hitObj.point.x, hitObj.point.y, hitObj.point.z], config.muzzle, hitEnemy ? 6 : 3),
+              );
 
               // Sparks
               const sparkCount = hitEnemy ? 6 : 2;

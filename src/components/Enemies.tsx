@@ -18,7 +18,7 @@ const EnemyMesh = ({ id, position, type }: { id: string, position: [number, numb
   const takeDamage = useStore((s) => s.takeDamage);
   const removeEnemy = useStore((s) => s.removeEnemy);
 
-  const speed = useMemo(() => 4 + Math.random() * 4, []);
+  const speed = useMemo(() => 3 + Math.random() * 7, []); // wider variance: slow drifters + fast rushers
   const isCandle = type === 'candle';
 
   useEffect(() => () => { enemyLive.delete(id); }, [id]);

@@ -4,18 +4,42 @@ import * as THREE from 'three';
 import { useStore } from '../store';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { socket } from '../socket';
-import { getAsset, ASSET_IDS } from '../config/assets';
+import { getAsset, BUILD_IDS } from '../config/assets';
 import { PropVisual } from './PlacedProps';
 
 /**
- * Valheim-style build editor (toggle B). Aim at any surface; the ghost is the
- * real model at the current transform. Scroll = cycle asset, R = rotate,
- * [ / ] = scale down/up, G = static⇄physics, LMB = place, RMB = delete nearest.
+ * Valheim × Fortnite build editor (toggle B). ONLY cheap primitive build pieces
+ * (BUILD_IDS — no model loads in the palette). Aim at any surface; placement
+ * snaps to a 2-unit grid (x/y/z) and 90° rotation steps. Scroll = cycle piece,
+ * R = rotate 90°, [ / ] = size ×1–×2, G = static⇄physics, LMB place, RMB delete.
+ * Ghost tints green when placement is valid, red when nothing is hit.
  * Placements broadcast (+ late-join snapshot in socket.ts). Weapons/grapple are
  * suppressed while editing (Player.tsx).
  */
 const _center = new THREE.Vector2(0, 0);
 const _ray = new THREE.Raycaster();
+
+const GRID = 2;                    // grid snap (units)
+const ROT_STEP = Math.PI / 2;      // 90° rotation steps
+const SCALE_MIN = 1;
+const SCALE_MAX = 2;
+const GHOST_RANGE = 14;            // where the red ghost floats when nothing is hit
+
+const snap = (v: number) => Math.round(v / GRID) * GRID;
+const snapRot = (r: number) => Math.round(r / ROT_STEP) * ROT_STEP;
+
+// Ghost-only tintable holo material (module-level, mutated in useFrame — never
+// shared with placed pieces, so tinting it can't leak into the world).
+const GHOST_MAT = new THREE.MeshStandardMaterial({
+  transparent: true,
+  opacity: 0.55,
+  toneMapped: false,
+  depthWrite: false,
+  metalness: 0,
+  roughness: 0.5,
+});
+const COL_VALID = new THREE.Color('#00f5d4');   // PALETTE.bull
+const COL_INVALID = new THREE.Color('#ff2d2d'); // PALETTE.alertRed
 
 export const Editor = () => {
   const { camera, scene } = useThree();
@@ -24,25 +48,26 @@ export const Editor = () => {
   const ghostRef = useRef<THREE.Group>(null);
   const prevPlace = useRef(false);
   const prevDelete = useRef(false);
-  const hitPt = useRef(new THREE.Vector3());
+  const hitPt = useRef(new THREE.Vector3());   // raw surface hit (delete search)
+  const snapPt = useRef(new THREE.Vector3());  // grid-snapped placement point
   const hasHit = useRef(false);
 
-  // Editor-only input: scroll cycles asset, R/[/]/G tweak the transform.
+  // Editor-only input: scroll cycles build piece, R/[/]/G tweak the transform.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
       if (!st.editorMode) return;
-      if (e.code === 'KeyR') st.setEditorRotY(st.editorRotY + Math.PI / 8);
-      else if (e.code === 'BracketRight' || e.code === 'Equal') st.setEditorScale(Math.min(30, st.editorScale * 1.15));
-      else if (e.code === 'BracketLeft' || e.code === 'Minus') st.setEditorScale(Math.max(0.1, st.editorScale / 1.15));
+      if (e.code === 'KeyR') st.setEditorRotY(snapRot(st.editorRotY) + ROT_STEP);
+      else if (e.code === 'BracketRight' || e.code === 'Equal') st.setEditorScale(Math.min(SCALE_MAX, st.editorScale * 1.25));
+      else if (e.code === 'BracketLeft' || e.code === 'Minus') st.setEditorScale(Math.max(SCALE_MIN, st.editorScale / 1.25));
       else if (e.code === 'KeyG') st.setEditorBody(st.editorBody === 'fixed' ? 'dynamic' : 'fixed');
     };
     const onWheel = (e: WheelEvent) => {
       const st = useStore.getState();
       if (!st.editorMode) return;
-      const i = ASSET_IDS.indexOf(st.editorSelect);
-      const n = (i + (e.deltaY > 0 ? 1 : -1) + ASSET_IDS.length) % ASSET_IDS.length;
-      st.setEditorSelect(ASSET_IDS[n]);
+      const i = BUILD_IDS.indexOf(st.editorSelect);
+      const n = (i + (e.deltaY > 0 ? 1 : -1) + BUILD_IDS.length) % BUILD_IDS.length;
+      st.setEditorSelect(BUILD_IDS[n]);
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('wheel', onWheel, { passive: true });
@@ -59,12 +84,21 @@ export const Editor = () => {
     }
     const sel = st.editorSelect;
     const spec = getAsset(sel);
-    const off = spec.prim === 'pad' ? 0.5 : 0;
+    // Store may hold a non-buildable id (old session / avatar digit) — recover.
+    if (!spec.buildable) { st.setEditorSelect(BUILD_IDS[0]); return; }
+    const off = spec.prim === 'pad' ? 0.5 : 0; // legacy pad is center-origin
+    const rotY = snapRot(st.editorRotY);
+    const scl = Math.min(SCALE_MAX, Math.max(SCALE_MIN, st.editorScale));
 
     _ray.setFromCamera(_center, camera);
     const hits = _ray.intersectObjects(scene.children, true);
     hasHit.current = false;
     for (const h of hits) {
+      // The always-visible ghost carries hit tags too — never raycast ourselves.
+      let o: THREE.Object3D | null = h.object;
+      let isGhost = false;
+      while (o) { if (o === ghostRef.current) { isGhost = true; break; } o = o.parent; }
+      if (isGhost) continue;
       const ud = h.object.userData;
       if (ud?.isFloor || ud?.isWall || ud?.isJumpPad) {
         hitPt.current.copy(h.point);
@@ -73,23 +107,30 @@ export const Editor = () => {
       }
     }
 
-    if (ghostRef.current) {
-      ghostRef.current.visible = hasHit.current;
-      if (hasHit.current) {
-        ghostRef.current.position.set(hitPt.current.x, hitPt.current.y + off, hitPt.current.z);
-        ghostRef.current.rotation.y = st.editorRotY;
-        ghostRef.current.scale.setScalar(spec.baseScale * st.editorScale);
-      }
+    if (hasHit.current) {
+      snapPt.current.set(snap(hitPt.current.x), snap(hitPt.current.y) + off, snap(hitPt.current.z));
+    } else {
+      _ray.ray.at(GHOST_RANGE, snapPt.current); // free-floating red ghost
     }
 
-    // place (LMB edge)
+    if (ghostRef.current) {
+      ghostRef.current.visible = true;
+      ghostRef.current.position.copy(snapPt.current);
+      ghostRef.current.rotation.y = rotY;
+      ghostRef.current.scale.setScalar(spec.baseScale * scl);
+      GHOST_MAT.color.copy(hasHit.current ? COL_VALID : COL_INVALID);
+      GHOST_MAT.emissive.copy(hasHit.current ? COL_VALID : COL_INVALID);
+      GHOST_MAT.emissiveIntensity = hasHit.current ? 0.9 : 0.6;
+    }
+
+    // place (LMB edge) — only on a valid snapped surface hit
     if (keys.shoot && !prevPlace.current && hasHit.current) {
       const prop = {
         id: Math.random().toString(36).slice(2, 9),
         assetId: sel,
-        x: hitPt.current.x, y: hitPt.current.y + off, z: hitPt.current.z,
-        rotY: st.editorRotY,
-        scale: st.editorScale,
+        x: snapPt.current.x, y: snapPt.current.y, z: snapPt.current.z,
+        rotY,
+        scale: scl,
         body: st.editorBody,
       };
       st.addProp(prop);
@@ -111,11 +152,11 @@ export const Editor = () => {
     prevDelete.current = keys.grapple;
   });
 
-  // Ghost = the real model (swaps when editorSelect changes); transform driven
-  // imperatively each frame above.
+  // Ghost = the real piece with a tintable override material (swaps when
+  // editorSelect changes); transform + tint driven imperatively each frame.
   return (
     <group ref={ghostRef} visible={false}>
-      <PropVisual assetId={editorSelect} />
+      <PropVisual assetId={editorSelect} material={GHOST_MAT} />
     </group>
   );
 };

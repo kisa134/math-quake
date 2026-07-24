@@ -55,6 +55,14 @@ interface PlacedProp {
   body: 'fixed' | 'dynamic';
 }
 
+// Neutral roaming critter (WS-E): host-simulated, mirrored to peers like enemies.
+export interface Creature {
+  id: string;
+  type: string;
+  x: number; y: number; z: number;
+  hp: number;
+}
+
 interface PlayerState {
   id: string;
   x: number;
@@ -91,6 +99,11 @@ interface GameState {
   spellWheelOpen: boolean;
   // Avatar (WS-5): third-person figure chosen at start
   avatarId: string;
+  // Vehicles (V2 WS-B): id of the car being driven, or null on foot
+  driving: string | null;
+  // Neutral creatures (V2 WS-E): host sims `creatures`, peers mirror `netCreatures`
+  creatures: Creature[];
+  netCreatures: Creature[];
   isHost: boolean;            // this client owns/simulates the shared enemies
   netEnemies: { id: string; type: string; x: number; y: number; z: number; hp: number }[];
   setIsHost: (v: boolean) => void;
@@ -131,6 +144,11 @@ interface GameState {
   setSelectedSpell: (id: string) => void;
   setSpellWheel: (open: boolean) => void;
   setAvatar: (id: string) => void;
+  setDriving: (id: string | null) => void;
+  setCreatures: (c: Creature[]) => void;
+  setNetCreatures: (c: Creature[]) => void;
+  removeCreature: (id: string) => void;
+  addMinion: (m: { x: number; y: number; z: number }) => void;
   setWeapon: (index: number) => void;
   startGame: () => void;
   gameOver: () => void;
@@ -159,6 +177,9 @@ export const useStore = create<GameState>((set) => ({
   selectedSpell: 'none', // 'none' = fire the equipped weapon's own shot; wheel picks a spell override
   spellWheelOpen: false,
   avatarId: 'skull',
+  driving: null,
+  creatures: [],
+  netCreatures: [],
   isHost: true,           // solo/default = host (owns enemies); presence demotes non-hosts
   netEnemies: [],
   isPlaying: false,
@@ -187,7 +208,7 @@ export const useStore = create<GameState>((set) => ({
   
   spawnEnemy: () => set((state) => {
     if (!state.isPlaying) return state;
-    if (state.enemies.length >= 20) return state; // Max 20 enemies
+    if (state.enemies.length >= 40) return state; // Max 40 enemies
     
     const isCandle = Math.random() > 0.8;
     const type = isCandle ? 'candle' : SHAPES[Math.floor(Math.random() * (SHAPES.length - 1))];
@@ -318,6 +339,11 @@ export const useStore = create<GameState>((set) => ({
   setSelectedSpell: (id) => set({ selectedSpell: id }),
   setSpellWheel: (open) => set({ spellWheelOpen: open }),
   setAvatar: (id) => set({ avatarId: id }),
+  setDriving: (id) => set({ driving: id }),
+  setCreatures: (c) => set({ creatures: c }),
+  setNetCreatures: (c) => set({ netCreatures: c }),
+  removeCreature: (id) => set((s) => ({ creatures: s.creatures.filter((c) => c.id !== id) })),
+  addMinion: (m) => set((s) => (s.localMinions.length >= 6 ? s : { localMinions: [...s.localMinions, m] })),
   setIsHost: (v) => set({ isHost: v }),
   setNetEnemies: (e) => set({ netEnemies: e }),
   // Replay a kill's voxel burst + shake/sound locally (non-host, when a shared

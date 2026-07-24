@@ -26,6 +26,49 @@ const SMALL_COUNT = 10, CANDLE_COUNT = 18;
 const RADIAL = 12, SCATTER = 8, POP_UP = 6, SPIN = 8;
 const NEON = ['#f72585', '#00f5d4', '#4361ee', '#7209b7', '#4cc9f0', '#b5179e'];
 
+/**
+ * Pixel-fire burst: small bright chunks that lick UPWARD from a point, colors
+ * ramping from the weapon/spell base color toward yellow-white (hottest chunks
+ * whitest — classic pixel-art fire). Rides the existing Debris pool: callers do
+ * `addDebris(makeFlames(...))` — no new render system, capped by DEBRIS_CAP.
+ */
+export function makeFlames(
+  pos: [number, number, number],
+  baseColor: string,
+  count = 6,
+): Omit<DebrisChunk, 'id' | 'createdAt'>[] {
+  const [x, y, z] = pos;
+  const n = parseInt(baseColor.replace('#', ''), 16);
+  const br = Number.isNaN(n) ? 255 : (n >> 16) & 255;
+  const bg = Number.isNaN(n) ? 136 : (n >> 8) & 255;
+  const bb = Number.isNaN(n) ? 0 : n & 255;
+  const out: Omit<DebrisChunk, 'id' | 'createdAt'>[] = [];
+  for (let i = 0; i < count; i++) {
+    // f=0 → pure base color, f=1 → hot yellow-white tip.
+    const f = count > 1 ? i / (count - 1) : 1;
+    const r = Math.round(br + (255 - br) * f);
+    const g = Math.round(bg + (240 - bg) * f);
+    const b = Math.round(bb + (170 - bb) * f * 0.9);
+    const color = '#' + ((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1);
+    out.push({
+      x: x + (Math.random() - 0.5) * 0.3,
+      y: y + Math.random() * 0.15,
+      z: z + (Math.random() - 0.5) * 0.3,
+      vx: (Math.random() - 0.5) * 1.6,
+      vy: 2 + Math.random() * 4, // flames rise
+      vz: (Math.random() - 0.5) * 1.6,
+      color,
+      size: 0.12 + Math.random() * 0.13,
+      rx: 0, ry: 0, rz: 0,
+      sx: (Math.random() - 0.5) * 6,
+      sy: (Math.random() - 0.5) * 6,
+      sz: (Math.random() - 0.5) * 6,
+      life: 0.5 + Math.random() * 0.4, // 500–900ms flicker
+    });
+  }
+  return out;
+}
+
 export const colorForEnemy = (e: Shatterable): string =>
   e.type === 'candle'
     ? (Math.random() > 0.5 ? '#00f5d4' : '#f72585')

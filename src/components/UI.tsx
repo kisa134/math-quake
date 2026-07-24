@@ -92,7 +92,7 @@ export const UI = () => {
                 <div className="text-2xl font-black italic uppercase tracking-widest bg-white text-black py-1 px-4 mb-2">
                   {editorMode ? propName : weaponName}
                 </div>
-                <div className="text-xs text-emerald-400 font-mono">{editorMode ? 'SCROLL asset · R rotate · [ ] size · G static/phys · LMB place · RMB del' : '[1-9] WEAPON · [B] BUILD'}</div>
+                <div className="text-xs text-emerald-400 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-5] WEAPON · [B] BUILD'}</div>
               </div>
             </div>
 
@@ -113,7 +113,7 @@ export const UI = () => {
       {isPlaying && editorMode && (
         <div className="absolute top-24 left-1/2 -translate-x-1/2 text-center pointer-events-none">
           <div className="text-amber-300 font-black tracking-[0.3em] text-sm uppercase">🔧 Build — {propName} · ×{editorScale.toFixed(2)} · {editorBody === 'dynamic' ? 'PHYSICS' : 'STATIC'}</div>
-          <div className="text-[10px] font-mono text-white/60 mt-1 uppercase tracking-widest">SCROLL asset · R rotate · [ ] size · G static/phys &nbsp;|&nbsp; LMB place · RMB delete · B exit</div>
+          <div className="text-[10px] font-mono text-white/60 mt-1 uppercase tracking-widest">SCROLL piece · R rotate 90° · [ ] size · G static/phys &nbsp;|&nbsp; GRID SNAP · LMB place · RMB delete · B exit</div>
         </div>
       )}
 

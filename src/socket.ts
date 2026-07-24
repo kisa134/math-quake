@@ -1,6 +1,7 @@
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
 import { useStore } from './store';
 import { SUPABASE_URL, SUPABASE_ANON } from './net/supabaseConfig';
+import { creatureHitInbox } from './game/creatureNet';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -94,6 +95,20 @@ export const initMultiplayer = (roomId: string) => {
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
+  });
+
+  // --- neutral creatures (host-authoritative, WS-E) ---
+  channel.on('broadcast', { event: 'creatures' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (!useStore.getState().isHost) useStore.getState().setNetCreatures(payload.list || []);
+  });
+  channel.on('broadcast', { event: 'chit' }, ({ payload }) => {
+    if (!payload) return;
+    if (useStore.getState().isHost) creatureHitInbox.push({ id: payload.id, damage: payload.damage });
+  });
+  channel.on('broadcast', { event: 'tame' }, ({ payload }) => {
+    if (!payload) return;
+    if (useStore.getState().isHost) creatureHitInbox.push({ id: payload.id, damage: 0, tame: true });
   });
 
   // --- editor: shared prop placement/removal ---
