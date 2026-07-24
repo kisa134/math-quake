@@ -14,6 +14,7 @@ import { PlacedProps } from './PlacedProps';
 import { Train } from './Train';
 import { Cars } from './Cars';
 import { Creatures } from './Creatures';
+import { VoxelCandles } from './VoxelCandles';
 import { Editor } from './Editor';
 import { PostFX } from './PostFX';
 import { useEffect } from 'react';
@@ -54,6 +55,7 @@ export const Game = () => {
 
         <Arena />
         <Cityscape />
+        <VoxelCandles />
         <Player />
         <LocalMinions />
         <RemotePlayers />

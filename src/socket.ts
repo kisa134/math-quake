@@ -2,6 +2,7 @@ import { createClient, type RealtimeChannel } from '@supabase/supabase-js';
 import { useStore } from './store';
 import { SUPABASE_URL, SUPABASE_ANON } from './net/supabaseConfig';
 import { creatureHitInbox } from './game/creatureNet';
+import { voxInbox } from './game/voxCandles';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -95,6 +96,12 @@ export const initMultiplayer = (roomId: string) => {
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
+  });
+
+  // --- Teardown voxel candles: replicate carves (V2.1) ---
+  channel.on('broadcast', { event: 'vox' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    voxInbox.push({ id: payload.id, x: payload.x, y: payload.y, z: payload.z, r: payload.r });
   });
 
   // --- neutral creatures (host-authoritative, WS-E) ---

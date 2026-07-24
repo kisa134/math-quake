@@ -19,6 +19,7 @@ import { carPositions, tryToggleCar } from './Cars';
 import { grappleCityHits } from './Cityscape';
 import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
+import { carveVoxCandle } from './VoxelCandles';
 
 const JUMP_FORCE = 15;
 
@@ -581,7 +582,11 @@ export const Player = () => {
               obj = obj.parent;
             }
             if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
-              _endPoint.copy(hitObj.point); break;
+              _endPoint.copy(hitObj.point);
+              if (hitObj.object.userData?.isVoxCandle) {
+                carveVoxCandle(+hitObj.object.userData.id, hitObj.point.x, hitObj.point.y, hitObj.point.z, 1.0 + spell.damage * 0.012);
+              }
+              break;
             }
           }
           if (laserRef.current) {
@@ -690,6 +695,11 @@ export const Player = () => {
             }
             if (isHit || hitObj.object.userData?.isWall || hitObj.object.userData?.isFloor || hitObj.object.userData?.isJumpPad) {
               _endPoint.copy(hitObj.point);
+
+              // Teardown voxel candles: carve a damage-scaled sphere of voxels out.
+              if (hitObj.object.userData?.isVoxCandle) {
+                carveVoxCandle(+hitObj.object.userData.id, hitObj.point.x, hitObj.point.y, hitObj.point.z, 1.0 + config.damage * 0.012);
+              }
 
               // Pixel-fire burn at the impact point, in the weapon's muzzle color.
               useStore.getState().addDebris(

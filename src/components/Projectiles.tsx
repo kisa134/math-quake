@@ -7,6 +7,7 @@ import { addTrauma } from '../game/shake';
 import { getSpell } from '../config/spells';
 import { makeFlames } from '../game/voxel';
 import type { DebrisChunk } from '../game/voxel';
+import { carveVoxCandle } from './VoxelCandles';
 
 /**
  * Projectile behaviors — V2: сложносочинённая magic (multi-stage, layered).
@@ -272,6 +273,10 @@ const Projectile = ({ id, position, velocity, fromPlayer, createdAt, kind, color
           }
           if (hitEnemy || hit.object.userData?.isWall || hit.object.userData?.isFloor || hit.object.userData?.isJumpPad) {
             const hx = hit.point.x, hy = hit.point.y, hz = hit.point.z;
+            // Teardown voxel candles: projectiles carve too (bigger bite).
+            if (hit.object.userData?.isVoxCandle) {
+              carveVoxCandle(+hit.object.userData.id, hx, hy, hz, 1.2 + dmg * 0.014);
+            }
             if (kind === 'void') {
               // Stage impact: implosion shell + purple flames (no outward burst).
               voidImplosion(hx, hy, hz, baseColor);

@@ -11,6 +11,7 @@ import * as THREE from 'three';
 export interface HitTag {
   isEnemy?: boolean;
   isCreature?: boolean; // neutral critter (WS-E): damageable via damageCreature, tameable via T
+  isVoxCandle?: boolean; // Teardown-style voxel candle proxy (V2.1): shots carve voxels
   isPlayer?: boolean;
   isFloor?: boolean;
   isWall?: boolean;
