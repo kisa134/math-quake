@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { BLACK_HOLE, conductorState } from '../game/voxCandles';
 import { blackHoleFeed } from './VoxelCandles';
 import { accent } from '../game/accent';
+import { audioReactive } from '../game/audioReactive';
 
 /**
  * V6 — THE VILLAIN DONUT. Абсолютно чёрное тело (свет не существует внутри),
@@ -108,7 +109,8 @@ export const BlackHole = () => {
     const cs = conductorState(t);
     blackHoleFeed.v = Math.max(0, blackHoleFeed.v - blackHoleFeed.v * 2 * dt);
     (rimMat.uniforms.uHeart as { value: number }).value = cs.heartPhase;
-    (rimMat.uniforms.uFeed as { value: number }).value = blackHoleFeed.v;
+    // V7.6: the villain rim breathes with the track's bass (on top of feed flash)
+    (rimMat.uniforms.uFeed as { value: number }).value = blackHoleFeed.v + audioReactive.bass * 0.6;
     (diskMat.uniforms.uTime as { value: number }).value = t;
     ((diskMat.uniforms.uAccent as { value: THREE.Color }).value).copy(accent);
     if (groupRef.current) {

@@ -2,6 +2,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getCity } from '../game/cityscape';
+import { audioReactive } from '../game/audioReactive';
 
 /**
  * V7.5 Ц3 — THE LOWER SWARM: generateCity's 320 decorative bull/bear candles
@@ -35,6 +36,7 @@ export const LowerSwarm = () => {
   }, []);
 
   const ref = useRef<THREE.InstancedMesh>(null);
+  const matRef = useRef<THREE.MeshStandardMaterial>(null);
   const frame = useRef(0);
 
   useLayoutEffect(() => {
@@ -60,6 +62,8 @@ export const LowerSwarm = () => {
     const m = ref.current;
     if (!m) return;
     const t = state.clock.elapsedTime;
+    // V7.6: the lower swarm glows harder on the track's bass
+    if (matRef.current) matRef.current.emissiveIntensity = 0.4 + audioReactive.bass * 0.5;
     frame.current = (frame.current + 1) % 4;
     for (let i = frame.current; i < swarm.length; i += 4) {
       const s = swarm[i];
@@ -80,7 +84,7 @@ export const LowerSwarm = () => {
   return (
     <instancedMesh ref={ref} args={[undefined, undefined, swarm.length]}>
       <boxGeometry args={[1, 1, 1]} />
-      <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} toneMapped={false} roughness={0.4} metalness={0.3} />
+      <meshStandardMaterial ref={matRef} color="#ffffff" emissive="#ffffff" emissiveIntensity={0.4} toneMapped={false} roughness={0.4} metalness={0.3} />
     </instancedMesh>
   );
 };

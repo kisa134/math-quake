@@ -31,7 +31,7 @@ import { MATCH, wavesSize, roundWinReward } from '../config/economy';
 import { conductorState } from '../game/conductor';
 import { updateAccent } from '../game/accent';
 import { chron, EPOCH_CHRONICLE } from '../game/chronicle';
-import { setAmbientMood } from '../utils/audio';
+import { setAmbientMood, updateAudioReactive } from '../utils/audio';
 import { BotHorde } from './BotHorde';
 import { spawnBotWave, aliveBotCount } from './BotHorde';
 import { Dragons } from './Dragons';
@@ -57,6 +57,7 @@ let _lastEpoch = -1;
 const AccentDriver = () => {
   useFrame((state, dt) => {
     const cs = conductorState(state.clock.elapsedTime);
+    updateAudioReactive(); // V7.6: sample the track's spectrum once per frame
     updateAccent(cs.epoch, dt, performance.now());
     if (cs.epoch !== _lastEpoch) {
       _lastEpoch = cs.epoch;

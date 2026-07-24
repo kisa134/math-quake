@@ -13,6 +13,7 @@ export const initAudio = () => {
     audioCtx.resume();
   }
   startAmbient();
+  void startMusic(); // V7.6: the owner's looping track (silent no-op if none shipped)
 };
 
 // Low, evolving matrix drone under everything — atmosphere, not melody. Two
@@ -58,12 +59,25 @@ const startAmbient = () => {
 const MOOD_CUTOFF = [320, 430, 540, 380, 240, 180];
 const MOOD_GAIN = [0.05, 0.06, 0.07, 0.05, 0.065, 0.028];
 const MOOD_LFO = [0.07, 0.11, 0.16, 0.13, 0.24, 0.045];
+// V7.6: the owner's track breathes with the market too — brighter/louder into
+// euphoria, choked with the dub layer swelling in capitulation, near-silent in
+// the SILENCE epoch. НАКОП / ПАМП / ЭЙФОР / РАСПРОД / КАПИТУЛ / ТИШИНА.
+const MOOD_MUS_GAIN = [0.5, 0.62, 0.72, 0.52, 0.44, 0.3];
+const MOOD_MUS_CUT = [1500, 2600, 3600, 1800, 1000, 700];
+const MOOD_MUS_DUB = [0.1, 0.18, 0.26, 0.2, 0.34, 0.14];
 export const setAmbientMood = (epoch: number) => {
-  if (!audioCtx || !ambientFilter || !ambientBus || !ambientLfo) return;
+  if (!audioCtx) return;
   const t = audioCtx.currentTime;
-  ambientFilter.frequency.linearRampToValueAtTime(MOOD_CUTOFF[epoch] ?? 320, t + 2);
-  ambientBus.gain.linearRampToValueAtTime(MOOD_GAIN[epoch] ?? 0.05, t + 2);
-  ambientLfo.frequency.linearRampToValueAtTime(MOOD_LFO[epoch] ?? 0.07, t + 2);
+  if (ambientFilter && ambientBus && ambientLfo) {
+    ambientFilter.frequency.linearRampToValueAtTime(MOOD_CUTOFF[epoch] ?? 320, t + 2);
+    ambientBus.gain.linearRampToValueAtTime(MOOD_GAIN[epoch] ?? 0.05, t + 2);
+    ambientLfo.frequency.linearRampToValueAtTime(MOOD_LFO[epoch] ?? 0.07, t + 2);
+  }
+  if (musicMainGain && musicFilter && musicDubGain) {
+    musicMainGain.gain.linearRampToValueAtTime(MOOD_MUS_GAIN[epoch] ?? 0.5, t + 2);
+    musicFilter.frequency.linearRampToValueAtTime(MOOD_MUS_CUT[epoch] ?? 1600, t + 2);
+    musicDubGain.gain.linearRampToValueAtTime(MOOD_MUS_DUB[epoch] ?? 0.15, t + 2);
+  }
 };
 
 // ── V6.1 CAR AUDIO: engine loop + drift screech (created once, gain-driven) ──
@@ -134,6 +148,136 @@ export const stopEngine = () => {
   const t = audioCtx.currentTime;
   engGain.gain.setTargetAtTime(0, t, 0.15);
   screechGain.gain.setTargetAtTime(0, t, 0.08);
+};
+
+// ── V7.6 М1: THE OWNER'S TRACK — infinite evolving loop + analyser ──────────
+// One file (public/music/owner-track.mp3), looped seamlessly, but never quite
+// the same: a second detuned copy of the same buffer fades in/out over the top
+// (the "dub" layer), a slow LFO sweeps the master filter, and the whole thing
+// brightens/chokes with the market epoch (setAmbientMood). An AnalyserNode taps
+// the master so game visuals can breathe with the music (game/audioReactive.ts).
+import { audioReactive } from '../game/audioReactive';
+
+let musicBuf: AudioBuffer | null = null;
+let musicMain: AudioBufferSourceNode | null = null;
+let musicDub: AudioBufferSourceNode | null = null;
+let musicMainGain: GainNode | null = null;
+let musicDubGain: GainNode | null = null;
+let musicFilter: BiquadFilterNode | null = null;
+let musicOn = false;
+let analyser: AnalyserNode | null = null;
+let freqBuf: Uint8Array | null = null;
+
+const startMusic = async () => {
+  if (!audioCtx || musicOn) return;
+  musicOn = true;
+  try {
+    const url = `${import.meta.env.BASE_URL}music/owner-track.mp3`;
+    const res = await fetch(url);
+    if (!res.ok) { musicOn = false; return; } // no track shipped — game runs silent-music fine
+    musicBuf = await audioCtx.decodeAudioData(await res.arrayBuffer());
+    const t = audioCtx.currentTime;
+
+    // master chain: [main + dub] → musicFilter (lowpass) → analyser → destination
+    musicFilter = audioCtx.createBiquadFilter();
+    musicFilter.type = 'lowpass';
+    musicFilter.frequency.value = 1600;
+    musicFilter.Q.value = 0.6;
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.6;
+    freqBuf = new Uint8Array(analyser.frequencyBinCount);
+    musicFilter.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    // slow filter LFO — the loop breathes even when nothing else changes
+    const lfo = audioCtx.createOscillator();
+    const lfoGain = audioCtx.createGain();
+    lfo.frequency.value = 0.035;
+    lfoGain.gain.value = 500;
+    lfo.connect(lfoGain);
+    lfoGain.connect(musicFilter.frequency);
+    lfo.start(t);
+
+    // main loop (seamless)
+    musicMainGain = audioCtx.createGain();
+    musicMainGain.gain.value = 0.0;
+    musicMainGain.connect(musicFilter);
+    musicMain = audioCtx.createBufferSource();
+    musicMain.buffer = musicBuf;
+    musicMain.loop = true;
+    musicMain.connect(musicMainGain);
+    musicMain.start(t);
+    musicMainGain.gain.setTargetAtTime(0.5, t, 1.5); // fade in
+
+    // dub layer: same buffer, offset half a phrase + detuned — the evolving overlay
+    musicDubGain = audioCtx.createGain();
+    musicDubGain.gain.value = 0.0;
+    musicDubGain.connect(musicFilter);
+    musicDub = audioCtx.createBufferSource();
+    musicDub.buffer = musicBuf;
+    musicDub.loop = true;
+    musicDub.playbackRate.value = 1.006; // +0.6% — slowly drifts against the main
+    musicDub.connect(musicDubGain);
+    musicDub.start(t, (musicBuf.duration * 0.5) % musicBuf.duration);
+  } catch {
+    musicOn = false; // decode/CORS/etc — never break the game over music
+  }
+};
+
+/** Per-frame from AccentDriver: reduce the spectrum into smoothed bass/mid/level. */
+export const updateAudioReactive = () => {
+  if (!analyser || !freqBuf) return;
+  analyser.getByteFrequencyData(freqBuf);
+  const n = freqBuf.length;
+  let bass = 0, mid = 0, all = 0;
+  const bassEnd = Math.max(1, Math.floor(n * 0.12));
+  const midEnd = Math.floor(n * 0.5);
+  for (let i = 0; i < bassEnd; i++) bass += freqBuf[i];
+  for (let i = bassEnd; i < midEnd; i++) mid += freqBuf[i];
+  for (let i = 0; i < n; i++) all += freqBuf[i];
+  bass = bass / bassEnd / 255;
+  mid = mid / (midEnd - bassEnd) / 255;
+  all = all / n / 255;
+  // fast attack, slow release — swell not strobe («вкусно, не диско»)
+  const ramp = (cur: number, tgt: number) => tgt > cur ? cur + (tgt - cur) * 0.5 : cur + (tgt - cur) * 0.08;
+  audioReactive.bass = ramp(audioReactive.bass, bass);
+  audioReactive.mid = ramp(audioReactive.mid, mid);
+  audioReactive.level = ramp(audioReactive.level, all);
+};
+
+// V7.6 М2: the cinematic black-hole INHALE — a descending sine sweep under a
+// filtered rising noise «breath». Called from the swallow set-piece.
+export const playSuction = () => {
+  if (!audioCtx) return;
+  const t = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(220, t);
+  osc.frequency.exponentialRampToValueAtTime(28, t + 1.1);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.3, t + 0.2);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+  osc.connect(g); g.connect(audioCtx.destination);
+  osc.start(t); osc.stop(t + 1.2);
+
+  // rising filtered noise = the inhale of wind
+  const len = Math.floor(audioCtx.sampleRate * 1.1);
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (i / len); // swells IN
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const bp = audioCtx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(300, t);
+  bp.frequency.exponentialRampToValueAtTime(2200, t + 1.1);
+  bp.Q.value = 0.8;
+  const ng = audioCtx.createGain();
+  ng.gain.value = 0.22;
+  src.connect(bp); bp.connect(ng); ng.connect(audioCtx.destination);
+  src.start(t); src.stop(t + 1.1);
 };
 
 // Crisp high blip for a landed hit — the audible half of the hitmarker.

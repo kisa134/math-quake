@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { audioReactive } from './audioReactive';
 
 /**
  * V5 «Монохром живого рынка» — THE ONE ACCENT COLOR, conducted by the market.
@@ -25,6 +26,11 @@ let _lastCssPush = 0;
 /** Call once per frame (AccentDriver): lerp toward the epoch color + push CSS var (~5Hz). */
 export function updateAccent(epoch: number, dt: number, nowMs: number) {
   _target.set(EPOCH_ACCENTS[epoch] ?? EPOCH_ACCENTS[0]);
+  // V7.6: the whole world breathes with the track — subtle brightness swell on
+  // the beat («вкусно, не диско»: max ~+13%). Applied to the LERP TARGET so it
+  // self-corrects (never accumulates), then accent eases toward it.
+  const beat = 1 + audioReactive.level * 0.13;
+  _target.multiplyScalar(beat);
   accent.lerp(_target, Math.min(1, dt * 1.6));
   if (nowMs - _lastCssPush > 200) {
     _lastCssPush = nowMs;
