@@ -85,13 +85,14 @@ function mulberry32(seed: number) {
 
 // Mirrors src/theme.ts (kept local so cityscape stays a dependency-free pure
 // module). World = cold set only.
-const NEON = ['#4cc9f0', '#00f5d4', '#f72585', '#7209b7', '#4361ee', '#34d399'];
-const TOWER_TINTS = ['#0a0e20', '#0d1128', '#0b1530', '#12102e', '#0a1626', '#101033'];
-const COLD = ['#3a0ca3', '#4361ee', '#7209b7', '#4cc9f0', '#00f5d4', '#f72585'];
-const ICE_COLOR = '#9be7ff';
-const METAL_COLOR = '#8a94b8';
-const BULL = '#00f5d4';
-const BEAR = '#f72585';
+// V3 Bosch-psychedelia: wine/gold/forest (owner reference boards)
+const NEON = ['#ff4d6d', '#e9c46a', '#c9184a', '#f4a261', '#2fbf71', '#ff758f'];
+const TOWER_TINTS = ['#2a0f14', '#33121c', '#1d1410', '#22182a', '#141b14', '#2c101d'];
+const COLD = ['#6d1a36', '#a4133c', '#9d174d', '#e9c46a', '#2fbf71', '#c9184a'];
+const ICE_COLOR = '#e8e0d0';
+const METAL_COLOR = '#9a8f7a';
+const BULL = '#2fbf71';
+const BEAR = '#c9184a';
 
 const GROUND_Y = -50;      // void floor plane
 const GRAVITY = 30;        // must match <Physics gravity> in Game.tsx

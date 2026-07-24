@@ -46,7 +46,7 @@ export const UI = () => {
           {/* Top HUD */}
           <div className="relative z-10 flex justify-between p-8 items-start">
             <div className="flex flex-col">
-              <span className="text-emerald-500 font-black text-xs tracking-[0.3em] uppercase mb-1">Room: {roomId}</span>
+              <span className="text-amber-300 font-black text-xs tracking-[0.3em] uppercase mb-1">Room: {roomId}</span>
               <h1 className="text-5xl font-black italic tracking-tighter leading-none">KLEIN_04</h1>
               <div className="flex gap-4 mt-2">
                 <span className="text-[10px] bg-amber-400 text-black px-2 py-0.5 font-bold uppercase">GOD MODE</span>
@@ -54,8 +54,8 @@ export const UI = () => {
               </div>
             </div>
             <div className="text-right">
-              <span className="text-emerald-500 font-black text-xs tracking-[0.3em] uppercase mb-1">Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
-              <div className="text-4xl font-mono font-bold tabular-nums text-emerald-300">${money}</div>
+              <span className="text-amber-300 font-black text-xs tracking-[0.3em] uppercase mb-1">Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
+              <div className="text-4xl font-mono font-bold tabular-nums text-amber-200">${money}</div>
               <div className="text-[10px] opacity-40 uppercase tracking-widest mt-1">Damage pays · rounds pay more</div>
             </div>
           </div>
@@ -83,18 +83,18 @@ export const UI = () => {
                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-60">Topology Integrity</span>
                 <span className="text-6xl font-black tracking-tighter leading-none">{health}</span>
               </div>
-              <div className="h-4 bg-emerald-950 border border-emerald-500/30 overflow-hidden relative">
-                <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${health}%` }}></div>
+              <div className="h-4 bg-rose-950 border border-amber-400/30 overflow-hidden relative">
+                <div className="h-full bg-rose-500 transition-all duration-300" style={{ width: `${health}%` }}></div>
               </div>
             </div>
 
             <div className="flex flex-col items-center">
               <div className="w-full text-center">
-                <div className="text-emerald-500 font-black text-xs tracking-[0.4em] uppercase mb-2">{editorMode ? 'Build Mode' : 'Projector Active'}</div>
+                <div className="text-amber-300 font-black text-xs tracking-[0.4em] uppercase mb-2">{editorMode ? 'Build Mode' : 'Projector Active'}</div>
                 <div className="text-2xl font-black italic uppercase tracking-widest bg-white text-black py-1 px-4 mb-2">
                   {editorMode ? propName : weaponName}
                 </div>
-                <div className="text-xs text-emerald-400 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-5] WEAPON · [B] BUILD'}</div>
+                <div className="text-xs text-amber-200 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-5] WEAPON · [B] BUILD'}</div>
               </div>
             </div>
 
@@ -103,8 +103,8 @@ export const UI = () => {
                 <span className="text-6xl font-black tracking-tighter leading-none">{score}</span>
                 <span className="text-[10px] font-bold uppercase tracking-widest opacity-60 text-right">Vector Flux</span>
               </div>
-              <div className="h-4 bg-emerald-950 border border-emerald-500/30 overflow-hidden relative">
-                <div className="h-full bg-emerald-400 transition-all duration-300" style={{ width: `${Math.min(100, score)}%` }}></div>
+              <div className="h-4 bg-rose-950 border border-amber-400/30 overflow-hidden relative">
+                <div className="h-full bg-amber-400 transition-all duration-300" style={{ width: `${Math.min(100, score)}%` }}></div>
               </div>
             </div>
           </div>
@@ -125,9 +125,9 @@ export const UI = () => {
           onClick={grabLock}
           className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-pointer bg-black/50 backdrop-blur-sm"
         >
-          <div className="text-emerald-400 font-black text-xs tracking-[0.4em] uppercase mb-3">Math Quake</div>
+          <div className="text-amber-200 font-black text-xs tracking-[0.4em] uppercase mb-3">Math Quake</div>
           <div className="text-white font-black text-4xl uppercase tracking-widest mb-4">Click to play</div>
-          <div className="text-emerald-500/70 font-mono text-[11px] uppercase tracking-widest text-center max-w-md">
+          <div className="text-amber-300/70 font-mono text-[11px] uppercase tracking-widest text-center max-w-md">
             WASD · Mouse · LMB fire · Space jump · 2×Space jetpack · RMB grapple · B build · E magic · C boots · V 3rd-person
           </div>
         </div>
@@ -164,8 +164,8 @@ const DynamicCrosshair = () => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const c = '#10b981';
-  const glow = '0 0 4px rgba(16,185,129,0.9)';
+  const c = '#e9c46a'; // antique gold (V3 Bosch grade)
+  const glow = '0 0 4px rgba(233,196,106,0.9)';
   const tick = (rot: number): CSSProperties => ({
     position: 'absolute', left: '50%', top: '50%', width: 2, height: 9,
     marginLeft: -1, background: c, borderRadius: 2, boxShadow: glow,

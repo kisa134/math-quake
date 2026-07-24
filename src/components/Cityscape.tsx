@@ -203,11 +203,11 @@ export const Cityscape = () => {
       {/* --- floating candle swarms: 2 instanced draw calls --------------- */}
       <instancedMesh ref={bullsRef} args={[undefined, undefined, city.bulls.length]}>
         <primitive object={candleGeo} attach="geometry" />
-        <meshBasicMaterial color="#9fffef" toneMapped={false} />
+        <meshBasicMaterial color="#b8f2d8" toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={bearsRef} args={[undefined, undefined, city.bears.length]}>
         <primitive object={candleGeo} attach="geometry" />
-        <meshBasicMaterial color="#ffc0dd" toneMapped={false} />
+        <meshBasicMaterial color="#ffb3c1" toneMapped={false} />
       </instancedMesh>
 
       {/* --- playable climb skeleton (fixed RigidBodies) ------------------ */}

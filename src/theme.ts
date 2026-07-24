@@ -1,27 +1,31 @@
 /**
- * Locked palette for Math Quake (see docs/increments/03-world-matrix-finance.md).
- * One source of truth so world + UI read as a single synthwave/finance system.
+ * Locked palette for Math Quake — V3 «Босх-психоделия» art direction (owner
+ * reference boards, 2026-07-24): burgundy/crimson + antique gold + deep forest
+ * green + bone-cream on warm black. Maximalist fairytale-creepy, not synthwave.
  *
- * Rule: the WORLD uses cold blues/violets/mint + data-cyan. The warm/alert set
- * (amber, red, pure white) is reserved for ACTORS (enemies, tracers, muzzle,
- * hitmarkers) so the eye instantly separates gameplay from the psychedelia.
+ * Rule stays: the WORLD uses the wine/gold/forest set; the warm/alert actor set
+ * (amber, pure red, white) is reserved for enemies/tracers/hitmarkers so the
+ * eye instantly separates gameplay from the psychedelia.
+ *
+ * Keys are stable — components read PALETTE.*, so re-valuing this file reskins
+ * the world in one place.
  */
 export const PALETTE = {
-  // world (cold)
-  void: '#050510',
-  voidDeep: '#02020a',
-  gridCell: '#1a2140',
-  gridSect: '#4a2c73',
-  bull: '#00f5d4',
-  bullHot: '#5cffea',
-  bear: '#f72585',
-  bearHot: '#ff5fa8',
-  node: '#4361ee',
-  accentViolet: '#7209b7',
-  accentIndigo: '#3a0ca3',
-  uiCyan: '#4cc9f0',
-  dataEmerald: '#34d399',
-  bloomWhite: '#eafcff',
+  // world (wine / gold / forest)
+  void: '#0a0508',          // warm black
+  voidDeep: '#060305',      // fog + horizon
+  gridCell: '#3a2418',      // dark bronze grid
+  gridSect: '#8a5a1e',      // antique gold sections
+  bull: '#2fbf71',          // forest-emerald (bull candles, pads)
+  bullHot: '#7fe0a8',
+  bear: '#c9184a',          // deep crimson (bear candles)
+  bearHot: '#ff4d6d',
+  node: '#a4133c',          // wine — structural accents
+  accentViolet: '#9d174d',  // magenta-wine
+  accentIndigo: '#6d1a36',  // dark wine
+  uiCyan: '#e8c468',        // ← antique gold now (matrix-rain runes, trims)
+  dataEmerald: '#e9c46a',   // soft gold (screens, data)
+  bloomWhite: '#fff3dc',    // warm bone-white
 
   // actors (warm / alert) — world must NOT use these as big surfaces
   enemyAmber: '#ffb703',

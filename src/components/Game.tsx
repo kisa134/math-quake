@@ -15,6 +15,7 @@ import { Train } from './Train';
 import { Cars } from './Cars';
 import { Creatures } from './Creatures';
 import { VoxelCandles } from './VoxelCandles';
+import { Dreamscape } from './Dreamscape';
 import { Editor } from './Editor';
 import { PostFX } from './PostFX';
 import { useEffect, useRef } from 'react';
@@ -85,14 +86,17 @@ export const Game = () => {
       <fog attach="fog" args={[PALETTE.voidDeep, 200, 1800]} />
       <Physics gravity={[0, -30, 0]}>
         <GameManager />
-        <ambientLight intensity={0.18} />
+        {/* V3 Bosch grade: wine ambient + antique-gold key light (moonlight) */}
+        <ambientLight intensity={0.22} color="#c9a0b0" />
         <directionalLight
-          position={[10, 20, 10]}
-          intensity={0.6}
+          position={[60, 50, -90]} // from the crescent moon's corner
+          intensity={0.7}
+          color="#ffd9a0"
         />
 
         <Arena />
         <Cityscape />
+        <Dreamscape />
         <VoxelCandles />
         <Player />
         <LocalMinions />

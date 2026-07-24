@@ -1,4 +1,4 @@
-import { EffectComposer, Bloom, Vignette, SMAA } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, Vignette, SMAA, HueSaturation, BrightnessContrast } from '@react-three/postprocessing';
 
 /**
  * Post-processing — the heart of the "expensive" look (docs/increments/03).
@@ -6,8 +6,9 @@ import { EffectComposer, Bloom, Vignette, SMAA } from '@react-three/postprocessi
  * it the world is just "colored", not lit. Vignette focuses the frame; SMAA
  * cleans the neon edges (the canvas runs antialias:false).
  *
- * MVP stack only — chromatic aberration / scanline / glitch / selective-bloom
- * are deferred polish (see spec §3).
+ * V3 Bosch-psychedelia grade: richer saturation + a touch more contrast + a
+ * heavier storybook vignette — the ornate "dark fairytale plate" framing from
+ * the owner's reference boards.
  */
 export const PostFX = () => (
   <EffectComposer multisampling={0}>
@@ -18,7 +19,9 @@ export const PostFX = () => (
       mipmapBlur
       radius={0.7}
     />
-    <Vignette offset={0.25} darkness={0.75} />
+    <HueSaturation saturation={0.18} />
+    <BrightnessContrast brightness={-0.015} contrast={0.09} />
+    <Vignette offset={0.2} darkness={0.9} />
     <SMAA />
   </EffectComposer>
 );
