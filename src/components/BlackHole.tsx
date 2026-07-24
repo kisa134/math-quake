@@ -2,7 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BLACK_HOLE, conductorState } from '../game/voxCandles';
-import { blackHoleFeed } from './VoxelCandles';
+import { blackHoleFeed, blackHoleSuck } from './VoxelCandles';
 import { accent } from '../game/accent';
 import { audioReactive } from '../game/audioReactive';
 
@@ -69,6 +69,7 @@ const diskFragment = /* glsl */ `
 export const BlackHole = () => {
   const groupRef = useRef<THREE.Group>(null);
   const dustRef = useRef<THREE.InstancedMesh>(null);
+  const mawLightRef = useRef<THREE.PointLight>(null);
   const frame = useRef(0);
 
   const rimMat = useMemo(() => new THREE.ShaderMaterial({
@@ -108,6 +109,13 @@ export const BlackHole = () => {
     const t = state.clock.elapsedTime;
     const cs = conductorState(t);
     blackHoleFeed.v = Math.max(0, blackHoleFeed.v - blackHoleFeed.v * 2 * dt);
+    // V7.6 М2: suction decays slower (~1.5s half-life) — the cinematic inhale
+    blackHoleSuck.v = Math.max(0, blackHoleSuck.v - blackHoleSuck.v * 0.9 * dt);
+    const suck = blackHoleSuck.v;
+    if (mawLightRef.current) {
+      mawLightRef.current.intensity = suck * 9;
+      mawLightRef.current.distance = 1400;
+    }
     (rimMat.uniforms.uHeart as { value: number }).value = cs.heartPhase;
     // V7.6: the villain rim breathes with the track's bass (on top of feed flash)
     (rimMat.uniforms.uFeed as { value: number }).value = blackHoleFeed.v + audioReactive.bass * 0.6;
@@ -126,10 +134,11 @@ export const BlackHole = () => {
         const phase = dust[i * 4 + 1];
         const speed = dust[i * 4 + 2];
         const h0 = dust[i * 4 + 3];
-        const k = (t * speed + phase / (Math.PI * 2)) % 1;
-        const kk = Math.pow(k, 1.4);
+        // V7.6 М2: on a suction event the whole spiral accelerates inward
+        const k = (t * speed * (1 + suck * 1.6) + phase / (Math.PI * 2)) % 1;
+        const kk = Math.pow(k, 1.4 + suck * 1.2);
         const R = R0 + (BLACK_HOLE.ringR * 0.85 - R0) * kk;
-        const th = phase + t * 0.12 + kk * 7; // spiral tightens toward the maw
+        const th = phase + t * 0.12 + kk * (7 + suck * 6); // spiral tightens toward the maw
         DUMMY.position.set(
           BLACK_HOLE.x + Math.cos(th) * R,
           BLACK_HOLE.y + h0 * (1 - kk),
@@ -147,6 +156,8 @@ export const BlackHole = () => {
 
   return (
     <group position={[BLACK_HOLE.x, BLACK_HOLE.y, BLACK_HOLE.z]}>
+      {/* V7.6 М2: the maw flares with crimson light during a suction event */}
+      <pointLight ref={mawLightRef} color="#ff2d55" intensity={0} distance={1400} decay={2} />
       <group ref={groupRef}>
         {/* THE VOID: absolute black — no light, no pattern, nothing */}
         <mesh onUpdate={(m) => { m.raycast = NO_RAYCAST; }}>

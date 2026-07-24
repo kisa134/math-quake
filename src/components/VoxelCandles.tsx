@@ -5,7 +5,7 @@ import { useStore } from '../store';
 import { tag } from '../game/hitTags';
 import { socket } from '../socket';
 import { addTrauma } from '../game/shake';
-import { playImpactSound, playExplosionSound } from '../utils/audio';
+import { playImpactSound, playExplosionSound, playSuction } from '../utils/audio';
 import {
   generateVoxCandles, voxDebris, voxInbox, VOX_SIZE, COLLAPSE_AT, BLACK_HOLE,
   candleLivePos, moodGain, fateOf, warpTime, conductorState, type VoxCandle,
@@ -33,6 +33,9 @@ const G = 26;
 
 // the donut's feed flash — BlackHole.tsx reads & decays this
 export const blackHoleFeed = { v: 0 };
+// V7.6 М2: the cinematic SUCTION scalar — slower decay than feed; drives the
+// maw light, dust acceleration, matrix wind, camera pull & post vignette.
+export const blackHoleSuck = { v: 0 };
 
 let _carve: ((id: number, x: number, y: number, z: number, r: number, broadcast: boolean) => void) | null = null;
 let _basePos: Float32Array | null = null;
@@ -246,14 +249,20 @@ export const VoxelCandles = () => {
         if (!hidden.current[ci]) {
           hidden.current[ci] = 1;
           blackHoleFeed.v = 1;
+          // V7.6 М2: a WHALE swallow (or every ~5th soul) is a CINEMATIC event —
+          // the whole suction machine spins up: light, wind, pull, post, sound.
+          const cinematic = c.voxScale >= 1.5 || (c.id % 5 === 0);
+          blackHoleSuck.v = Math.min(1.4, blackHoleSuck.v + (cinematic ? 1 : 0.25));
           const chunks: ReturnType<typeof voxDebris>[] = [];
-          for (let k = 0; k < 14; k++) {
+          const nCrumb = cinematic ? 26 : 14;
+          for (let k = 0; k < nCrumb; k++) {
             const ch = voxDebris(_pos.x, _pos.y, _pos.z, BLACK_HOLE.x, BLACK_HOLE.y, BLACK_HOLE.z, c.bull ? '#2fbf71' : '#c9184a');
             ch.vx *= -1; ch.vy = (BLACK_HOLE.y - _pos.y) * 0.15; ch.vz *= -1; // sucked INWARD
             chunks.push(ch);
           }
           useStore.getState().addDebris(chunks);
-          addTrauma(0.12);
+          addTrauma(cinematic ? 0.34 : 0.12);
+          if (cinematic) playSuction();
           hideCandle(c, m);
           touched = true;
         }
