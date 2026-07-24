@@ -10,7 +10,8 @@ import { voxGrid } from './voxHumanoid';
  * (затвор/помпа/блок стволов минигана — анимируются в WeaponModel).
  * Forward = −z, построено в юнитах ~1.0 длины → скалируется под vLen.
  */
-export type VoxGunKind = 'smg' | 'shotgun' | 'ak' | 'rail' | 'minigun' | 'deagle';
+export type VoxGunKind = 'smg' | 'shotgun' | 'ak' | 'rail' | 'minigun' | 'deagle'
+  | 'db' | 'printer' | 'harpoon' | 'swan';
 export type MovingKind = 'bolt' | 'pump' | 'barrels';
 
 export interface VoxGunBuild {
@@ -115,6 +116,82 @@ export function buildVoxGun(kind: VoxGunKind): VoxGunBuild {
           g(1, 1, 1.6, 0, 2.2, -10),
           g(1, 1, 1.6, 0, 2.2, -14),
           g(1, 1, 1.6, 0, 2.2, -18), // coil cubes down the spine
+        ]),
+        moving: { geo: g(0.9, 0.9, 2, 1, 1.5, -9), kind: 'bolt', pos: [0, 0, 0] },
+      };
+      break;
+    }
+    case 'db': {
+      // break-action double-barrel: two fat tubes + a break lever that pumps
+      b = {
+        body: merge([
+          g(2.4, 2.2, 7, 0, 0, -6),      // receiver
+          g(1.1, 1.1, 14, -0.75, 0.6, -19), // left barrel
+          g(1.1, 1.1, 14, 0.75, 0.6, -19),  // right barrel
+          g(1, 3, 2, 0, -3, -4),         // grip
+          g(1.2, 2, 4, 0, -0.5, -1),     // stock
+        ]),
+        glow: merge([
+          g(0.8, 0.8, 1, -0.75, 0.6, -22.5), // muzzle L
+          g(0.8, 0.8, 1, 0.75, 0.6, -22.5),  // muzzle R
+        ]),
+        moving: { geo: g(1.8, 0.8, 2.4, 0, 1.8, -5), kind: 'pump', pos: [0, 0, 0] },
+      };
+      break;
+    }
+    case 'printer': {
+      // the money printer: box + bill tray + slot barrel; the carriage prints
+      b = {
+        body: merge([
+          g(3, 3, 6, 0, 0, -6),      // box
+          g(2.6, 0.5, 3, 0, 2, -9),  // tray
+          g(2, 1, 4, 0, 0.5, -11),   // slot barrel
+          g(1, 3, 2, 0, -3, -4),     // grip
+        ]),
+        glow: merge([
+          g(2.2, 0.4, 1, 0, 2.4, -9.5), // fresh bill edge
+          g(1, 0.6, 3, 1.6, 0.8, -6),   // side indicator
+        ]),
+        moving: { geo: g(2.4, 0.7, 1.4, 0, 2.6, -8), kind: 'bolt', pos: [0, 0, 0] },
+      };
+      break;
+    }
+    case 'harpoon': {
+      // whale harpoon: a long shaft, barbed head, glow rings down the spine
+      b = {
+        body: merge([
+          g(1, 1, 26, 0, 0.5, -22),     // shaft
+          g(1.6, 2, 8, 0, -0.5, -6),    // housing
+          g(1, 3, 2, 0, -3, -5),        // grip
+          g(1.6, 1.6, 2, 0, 0.5, -25),  // head
+          g(0.6, 2, 1.6, -0.9, 0.2, -24), // barb L
+          g(0.6, 2, 1.6, 0.9, 0.2, -24),  // barb R
+        ]),
+        glow: merge([
+          g(1.4, 1.4, 0.8, 0, 0.5, -10),
+          g(1.4, 1.4, 0.8, 0, 0.5, -15),
+          g(1.4, 1.4, 0.8, 0, 0.5, -20),
+        ]),
+        moving: { geo: g(0.8, 0.8, 6, 0, 1.6, -12), kind: 'bolt', pos: [0, 0, 0] },
+      };
+      break;
+    }
+    case 'swan': {
+      // doomsday bird: wing body + a neck stepping up toward the muzzle + keel
+      b = {
+        body: merge([
+          g(2, 2.6, 10, 0, -0.5, -8),  // wing body
+          g(1, 1.2, 4, 0, 0.8, -12),   // neck 1
+          g(1, 1.2, 4, 0, 1.6, -15.5), // neck 2
+          g(1, 1.2, 4, 0, 2.4, -19),   // neck 3
+          g(1, 1.2, 4, 0, 3.2, -22.5), // neck 4 (head/muzzle)
+          g(1, 3, 2, 0, -3, -7),       // grip
+          g(1.2, 2, 4, 0, -0.4, -1),   // stock
+        ]),
+        glow: merge([
+          g(0.4, 2.2, 6, 0, 2, -10),     // keel feather
+          g(1.4, 0.5, 4, -1.2, 0, -8),   // wing stripe L
+          g(1.4, 0.5, 4, 1.2, 0, -8),    // wing stripe R
         ]),
         moving: { geo: g(0.9, 0.9, 2, 1, 1.5, -9), kind: 'bolt', pos: [0, 0, 0] },
       };

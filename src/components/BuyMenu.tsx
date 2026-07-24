@@ -34,9 +34,9 @@ export const BuyMenu = () => {
 
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
-      <div className="bg-black/80 border border-emerald-500/40 backdrop-blur-md p-6 min-w-[420px]">
+      <div className="bg-black/80 border border-emerald-500/40 backdrop-blur-md p-6 min-w-[640px]">
         <div className="flex justify-between items-baseline mb-4">
-          <div className="text-emerald-400 font-black text-sm tracking-[0.3em] uppercase">Buy Menu</div>
+          <div className="text-emerald-400 font-black text-sm tracking-[0.3em] uppercase">Арсенал</div>
           <div className="text-2xl font-mono font-bold text-emerald-300">${money}</div>
         </div>
         {round.phase === 'buy' && (
@@ -44,32 +44,26 @@ export const BuyMenu = () => {
             Round {round.num} — wave in {secsLeft}s
           </div>
         )}
-        <div className="flex flex-col gap-1">
+        <div className="grid grid-cols-2 gap-1">
           {WEAPONS.map((w, i) => {
-            const price = WEAPON_PRICES[i] ?? 0;
-            const isOwned = owned[i];
-            const affordable = money >= price;
+            const dps = Math.round((1000 / w.rate) * w.damage * (w.rays || 1));
             return (
               <div
                 key={w.name}
-                className={`flex justify-between items-center px-3 py-2 border font-mono text-sm ${
+                className={`flex justify-between items-center px-3 py-1.5 border font-mono text-[13px] ${
                   i === current
                     ? 'border-emerald-400 bg-emerald-500/15 text-emerald-200'
-                    : isOwned
-                      ? 'border-white/25 text-white/85'
-                      : affordable
-                        ? 'border-amber-400/50 text-amber-200'
-                        : 'border-white/10 text-white/30'
+                    : 'border-white/20 text-white/80'
                 }`}
               >
-                <span className="font-bold">[{i + 1}] {w.name}</span>
-                <span>{isOwned ? (i === current ? 'EQUIPPED' : 'OWNED') : price === 0 ? 'FREE' : `$${price}`}</span>
+                <span className="font-bold">[{i < 9 ? i + 1 : '·'}] {w.name}</span>
+                <span className="text-white/45 text-[11px]">{w.portal ? 'PORTALS' : `${w.damage}dmg · ${dps}dps`}</span>
               </div>
             );
           })}
         </div>
         <div className="text-[10px] font-mono text-white/50 mt-4 uppercase tracking-widest text-center">
-          1-9 buy / equip · P close · money = damage dealt + round wins
+          1-9 equip · 10+ колесом мыши · P close · деньги = рынок (Q)
         </div>
       </div>
     </div>

@@ -212,7 +212,7 @@ export const useStore = create<GameState>((set) => ({
   ridingDragon: null,
   buffs: { rage: 0, surge: 0, midas: 0 },
   money: ECON.startMoney,
-  ownedWeapons: WEAPON_PRICES.map((p) => p === 0), // free loadout: wand + dagger
+  ownedWeapons: WEAPON_PRICES.map(() => true), // V7.5: арсенал открыт — BuyMenu = свитчер
   buyMenuOpen: false,
   round: { num: 1, phase: 'buy', until: 0 },
   position: null,

@@ -36,7 +36,8 @@ export interface WeaponSpec {
   mRot: [number, number, number];
   // V4 CS gunfeel:
   spray?: [number, number][]; // fixed CS-style spray pattern (NDC offsets, climbs up); index resets after 260ms
-  voxel?: 'smg' | 'shotgun' | 'ak' | 'rail' | 'minigun' | 'deagle'; // V6: procedural voxel gun instead of FBX
+  voxel?: 'smg' | 'shotgun' | 'ak' | 'rail' | 'minigun' | 'deagle'
+    | 'db' | 'printer' | 'harpoon' | 'swan'; // V6/V7.5: procedural voxel gun instead of FBX
   portal?: boolean; // V6 Ш4: LMB places portals A/B instead of shooting
   heat?: boolean; // minigun: spread+rate scale with a spin-up heat 0..1
   slow?: number;  // movement speed multiplier while firing (minigun stomp)
@@ -105,6 +106,58 @@ export const WEAPONS: WeaponSpec[] = [
     tracer: 0x00b4d8, muzzle: '#9ee8ff', anim: 'thrust', portal: true,
     model: 'weapons/wand_01.fbx', vLen: 0.55, mScale: 1, voxel: 'deagle',
     mPos: [0.27, -0.32, -0.46], mRot: [0.2, 0.1, 0] },
+
+  // ── V7.5 ЦИРК: the second rack (slots 10-16, wheel-only past 9) ────────────
+  // 10 — BEAR TRAP: двустволка. One break-action wall of death, then you break
+  // it open and think about your choices.
+  { name: 'BEAR TRAP', rate: 1150, damage: 9, recoil: 0.8, sound: 130,
+    spread: 0.13, rays: 16, tracer: 0xff5714, muzzle: '#ffb499', anim: 'pump',
+    model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.85, mScale: 1, voxel: 'db',
+    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
+
+  // 11 — HFT STITCHER: high-frequency trading в форме ствола. Быстрее кинжала;
+  // спрей — длинная мелкая змейка, шьёт как швейная машинка.
+  { name: 'HFT STITCHER', rate: 45, damage: 7, recoil: 0.04, sound: 950,
+    tracer: 0xff4dc4, muzzle: '#ffc2ea', anim: 'thrust',
+    model: 'weapons/wand_01.fbx', vLen: 0.6, mScale: 1, voxel: 'smg',
+    mPos: [0.29, -0.34, -0.52], mRot: [0.12, 0.06, 0],
+    spray: [[0, 0], [0, 0.002], [0.002, 0.004], [-0.002, 0.007], [0.003, 0.009],
+      [-0.003, 0.012], [0.004, 0.014], [-0.004, 0.016], [0.003, 0.018],
+      [-0.003, 0.019], [0.004, 0.02], [-0.004, 0.02], [0.003, 0.021],
+      [-0.003, 0.021], [0.004, 0.022], [-0.004, 0.022]] },
+
+  // 12 — FED PRINTER: брррр. Долларово-зелёные болты из станка, каретка ездит.
+  { name: 'FED PRINTER', rate: 150, damage: 20, recoil: 0.1, sound: 500,
+    type: 'projectile', tracer: 0x2fbf71, muzzle: '#b7f7d4', anim: 'pump',
+    model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.7, mScale: 1, voxel: 'printer',
+    mPos: [0.29, -0.33, -0.52], mRot: [0, -1.5, 0] },
+
+  // 13 — WHALE HARPOON: нюк-копьё на китов. Медленно, толсто, окончательно.
+  { name: 'WHALE HARPOON', rate: 1000, damage: 170, recoil: 0.7, sound: 90,
+    type: 'projectile', thick: true, tracer: 0x4cc9f0, muzzle: '#c9f2ff', anim: 'thrust',
+    model: 'weapons/SM_Wep_Staff_02.fbx', vLen: 1.05, mScale: 1, voxel: 'harpoon',
+    mPos: [0.3, -0.36, -0.56], mRot: [0.08, 0, 0] },
+
+  // 14 — INSIDER TIP: тихий точный «псст». Белый DMR почти без спрея —
+  // информация, которой не должно у тебя быть.
+  { name: 'INSIDER TIP', rate: 230, damage: 48, recoil: 0.12, sound: 1250,
+    tracer: 0xffffff, muzzle: '#ffffff', anim: 'slash',
+    model: 'weapons/dagger_01.fbx', vLen: 0.48, mScale: 1.15, voxel: 'deagle',
+    mPos: [0.27, -0.32, -0.46], mRot: [0.3, 0.12, 0.08],
+    spray: [[0, 0], [0, 0], [0.002, 0.008]] },
+
+  // 15 — LIQUIDATOR: авто-дробовик. Каскадная распродажа в упор.
+  { name: 'LIQUIDATOR', rate: 340, damage: 8, recoil: 0.3, sound: 210,
+    spread: 0.08, rays: 6, tracer: 0xffa62b, muzzle: '#ffd9a0', anim: 'pump',
+    model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.8, mScale: 1, voxel: 'shotgun',
+    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
+
+  // 16 — BLACK SWAN: судный день. Один белый выстрел раз в две секунды —
+  // и что угодно перестаёт существовать. Никто его не предсказывает.
+  { name: 'BLACK SWAN', rate: 2000, damage: 300, recoil: 1.0, sound: 60,
+    thick: true, tracer: 0xffffff, muzzle: '#ffffff', anim: 'swing',
+    model: 'weapons/SM_Wep_Sword_Large_01.fbx', vLen: 1.0, mScale: 1, voxel: 'swan',
+    mPos: [0.29, -0.35, -0.54], mRot: [0.08, 0, 0.1] },
 ];
 
 export const weaponName = (i: number): string => WEAPONS[i]?.name ?? 'UNKNOWN';

@@ -14,7 +14,7 @@ export const WeaponHUD = () => {
 
   return (
     <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 pointer-events-none">
-      <div className="flex gap-2 px-3 py-2 bg-black/50 backdrop-blur-sm border border-white/10 rounded-sm">
+      <div className="grid grid-cols-8 gap-1.5 px-3 py-2 bg-black/50 backdrop-blur-sm border border-white/10 rounded-sm">
         {WEAPONS.map((w, i) => {
           const active = i === currentWeapon;
           const hex = '#' + w.tracer.toString(16).padStart(6, '0');
@@ -22,7 +22,7 @@ export const WeaponHUD = () => {
             <div
               key={i}
               className={
-                'flex flex-col gap-1 px-4 py-2 rounded-sm border transition-all duration-150 min-w-[120px] ' +
+                'flex flex-col gap-1 px-2 py-1.5 rounded-sm border transition-all duration-150 min-w-[92px] ' +
                 (active ? '-translate-y-1.5 bg-white/[0.07]' : 'bg-white/[0.02] border-white/10')
               }
               style={
@@ -31,16 +31,16 @@ export const WeaponHUD = () => {
                   : undefined
               }
             >
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span
-                  className="font-mono font-bold text-sm tabular-nums"
+                  className="font-mono font-bold text-xs tabular-nums"
                   style={{ color: active ? hex : 'rgba(255,255,255,0.35)' }}
                 >
-                  {i + 1}
+                  {i < 9 ? i + 1 : '·'}
                 </span>
                 <span
                   className={
-                    'text-[11px] font-black uppercase tracking-wider whitespace-nowrap ' +
+                    'text-[9px] font-black uppercase tracking-wider whitespace-nowrap ' +
                     (active ? 'text-white' : 'text-white/45')
                   }
                 >

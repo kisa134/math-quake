@@ -11,7 +11,9 @@
 // Prices by WEAPONS index:
 // [GLITCH WAND, SCATTER SHOT, PLASMA STAFF, RAIL BLADE, DELTA DAGGER,
 //  KALASH GLITCH, SALARY SHREDDER (minigun), MARGIN CALL (deagle)]
-export const WEAPON_PRICES = [0, 1200, 2700, 4750, 0, 2900, 6500, 900, 0];
+// V7.5: the arsenal is OPEN — prices are display-only history; money goes to
+// the market and (W3) chrome. Length stays index-aligned with WEAPONS (16).
+export const WEAPON_PRICES = [0, 1200, 2700, 4750, 0, 2900, 6500, 900, 0, 0, 0, 0, 0, 0, 0, 0];
 
 export const ECON = {
   startMoney: 800,
