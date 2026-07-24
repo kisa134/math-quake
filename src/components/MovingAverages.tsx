@@ -2,6 +2,7 @@ import { useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BLACK_HOLE, conductorState } from '../game/voxCandles';
+import { accent } from '../game/accent';
 
 /**
  * V4.3 — THREE MOVING-AVERAGE NERVES threaded through the candle belts
@@ -58,6 +59,7 @@ export const MovingAverages = () => {
       geoms[li].attributes.position.needsUpdate = true;
       mats[li].opacity = (0.3 + 0.25 * heart) * cs.dimGain;
     }
+    mats[0].color.copy(accent); // MA-20 wears the market's accent (V5 monochrome)
     cursor.current = (cursor.current + 32) % N_PTS;
   });
 

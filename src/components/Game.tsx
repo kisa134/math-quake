@@ -1,4 +1,4 @@
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useThree, useFrame } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -27,6 +27,8 @@ import { useStore } from '../store';
 import { PALETTE } from '../theme';
 import { socket } from '../socket';
 import { MATCH, wavesSize, roundWinReward } from '../config/economy';
+import { conductorState } from '../game/conductor';
+import { updateAccent } from '../game/accent';
 import { BotHorde } from './BotHorde';
 import { spawnBotWave, aliveBotCount } from './BotHorde';
 import { Dragons } from './Dragons';
@@ -38,6 +40,14 @@ import { BuffOrbs } from './BuffOrbs';
  * everyone gets the win bonus → next BUY. Peers mirror phase via 'round' and
  * pay themselves the bonus on 'roundwin' (money is client-local like HP).
  */
+/** V5: the market conducts THE ONE ACCENT COLOR of the whole world. */
+const AccentDriver = () => {
+  useFrame((state, dt) => {
+    updateAccent(conductorState(state.clock.elapsedTime).epoch, dt, performance.now());
+  });
+  return null;
+};
+
 /** V4.1 digital-maximalism CHROME: a procedural environment map (no network,
  *  no HDR download) so every metallic surface actually REFLECTS — instant
  *  hrom-glянец across towers, weapons, dragons. One-time PMREM bake. */
@@ -112,6 +122,7 @@ export const Game = () => {
     >
       <fog attach="fog" args={[PALETTE.voidDeep, 200, 1800]} />
       <ChromeEnv />
+      <AccentDriver />
       <Physics gravity={[0, -30, 0]}>
         <GameManager />
         {/* V3 Bosch grade: wine ambient + antique-gold key light (moonlight) */}

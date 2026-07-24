@@ -6,6 +6,7 @@ import type { CSSProperties } from 'react';
 import { onHitmarker, onFire, onKillFlash } from '../game/fx';
 import { weaponName as weaponNameOf } from '../config/weapons';
 import { getAsset } from '../config/assets';
+import { accentHex } from '../game/accent';
 import { WeaponHUD } from './WeaponHUD';
 import { SpellWheel } from './SpellWheel';
 import { BuyMenu } from './BuyMenu';
@@ -48,7 +49,7 @@ export const UI = () => {
           {/* Top HUD */}
           <div className="relative z-10 flex justify-between p-8 items-start">
             <div className="flex flex-col">
-              <span className="text-amber-300 font-black text-xs tracking-[0.3em] uppercase mb-1">Room: {roomId}</span>
+              <span className="font-black text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--accent, #c8b273)' }}>Room: {roomId}</span>
               <h1 className="text-5xl font-black italic tracking-tighter leading-none">KLEIN_04</h1>
               <div className="flex gap-4 mt-2">
                 <span className="text-[10px] bg-amber-400 text-black px-2 py-0.5 font-bold uppercase">GOD MODE</span>
@@ -56,7 +57,7 @@ export const UI = () => {
               </div>
             </div>
             <div className="text-right">
-              <span className="text-amber-300 font-black text-xs tracking-[0.3em] uppercase mb-1">Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
+              <span className="font-black text-xs tracking-[0.3em] uppercase mb-1" style={{ color: 'var(--accent, #c8b273)' }}>Round {round.num} · {round.phase === 'buy' ? 'BUY [P]' : 'WAVE'}</span>
               <div className="text-4xl font-mono font-bold tabular-nums text-amber-200">${money}</div>
               <div className={`text-[10px] uppercase tracking-widest mt-1 ${iAmTop ? 'text-amber-300 font-bold' : 'opacity-40'}`}>
                 {iAmTop ? '👑 TOP BAG — YOU' : `TOP BAG $${rivalMax} — NOT YOU`}
@@ -76,9 +77,9 @@ export const UI = () => {
 
           {/* Jetpack fuel */}
           <div className="absolute left-1/2 -translate-x-1/2 top-[60%] w-44 pointer-events-none">
-            <div className="text-[9px] font-mono tracking-[0.3em] text-cyan-300/70 mb-1 text-center uppercase">Jet Fuel · 2×Space</div>
-            <div className="h-2 bg-cyan-950/60 border border-cyan-500/30 overflow-hidden">
-              <div className="h-full" style={{ width: `${jetpackFuel}%`, background: jetpackFuel < 25 ? '#ff2d2d' : '#00f5d4', transition: 'width 90ms linear' }} />
+            <div className="text-[9px] font-mono tracking-[0.3em] mb-1 text-center uppercase opacity-70" style={{ color: 'var(--accent, #c8b273)' }}>Jet Fuel · 2×Space</div>
+            <div className="h-1.5 bg-black/50 border border-white/15 overflow-hidden">
+              <div className="h-full" style={{ width: `${jetpackFuel}%`, background: jetpackFuel < 25 ? '#ff2d2d' : 'var(--accent, #c8b273)', transition: 'width 90ms linear' }} />
             </div>
           </div>
 
@@ -226,6 +227,7 @@ const DynamicCrosshair = () => {
         const gap = 5 + bloom.current * 15; // px each tick is pushed from center
         el.style.setProperty('--g', `${gap}px`);
         el.style.opacity = String(0.75 + bloom.current * 0.25);
+        el.style.color = accentHex.v; // V5: the crosshair wears the market accent
       }
       raf = requestAnimationFrame(tick);
     };
@@ -233,18 +235,17 @@ const DynamicCrosshair = () => {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const c = '#e9c46a'; // antique gold (V3 Bosch grade)
-  const glow = '0 0 4px rgba(233,196,106,0.9)';
+  const glow = '0 0 4px currentColor';
   const tick = (rot: number): CSSProperties => ({
     position: 'absolute', left: '50%', top: '50%', width: 2, height: 9,
-    marginLeft: -1, background: c, borderRadius: 2, boxShadow: glow,
+    marginLeft: -1, background: 'currentColor', borderRadius: 2, boxShadow: glow,
     transform: `rotate(${rot}deg) translateY(calc(-1 * (var(--g,5px) + 4px)))`,
     transformOrigin: 'center top',
   });
   return (
-    <div ref={rootRef} className="absolute inset-0 flex items-center justify-center pointer-events-none">
+    <div ref={rootRef} className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ color: '#c8b273' }}>
       <div className="relative" style={{ width: 0, height: 0 }}>
-        <div style={{ position: 'absolute', left: -1.5, top: -1.5, width: 3, height: 3, borderRadius: '50%', background: c, boxShadow: glow }} />
+        <div style={{ position: 'absolute', left: -1.5, top: -1.5, width: 3, height: 3, borderRadius: '50%', background: 'currentColor', boxShadow: glow }} />
         <div style={tick(0)} />
         <div style={tick(90)} />
         <div style={tick(180)} />

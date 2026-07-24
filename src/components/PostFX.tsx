@@ -19,9 +19,10 @@ export const PostFX = () => (
       mipmapBlur
       radius={0.7}
     />
-    <HueSaturation saturation={0.18} />
-    <BrightnessContrast brightness={-0.015} contrast={0.09} />
-    <Vignette offset={0.2} darkness={0.9} />
+    {/* V5 minimal grade: calmer saturation, thinner vignette — gallery light */}
+    <HueSaturation saturation={0.06} />
+    <BrightnessContrast brightness={-0.01} contrast={0.07} />
+    <Vignette offset={0.22} darkness={0.78} />
     <SMAA />
   </EffectComposer>
 );

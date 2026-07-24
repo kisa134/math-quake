@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { RigidBody } from '@react-three/rapier';
 import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
+import { accent } from '../game/accent';
 import { generateCity, type ClimbPiece, type Inst } from '../game/cityscape';
 
 /**
@@ -116,6 +117,9 @@ export const Cityscape = () => {
   const planetRefs = useRef<Array<THREE.Group | null>>([]);
   const planetPatched = useRef<boolean[]>([]);
   const frame = useRef(0);
+  // V5: strip/roof glow follows THE accent (market-conducted world color)
+  const stripMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const roofMatRef = useRef<THREE.MeshBasicMaterial>(null);
 
   // Dev perf helper: window.__perf() → { calls, tris }
   const gl = useThree((s) => s.gl);
@@ -130,6 +134,10 @@ export const Cityscape = () => {
   useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
     frame.current = (frame.current + 1) % 8;
+
+    // V5 monochrome: the city's glow IS the market's mood
+    if (stripMatRef.current) stripMatRef.current.color.copy(accent);
+    if (roofMatRef.current) roofMatRef.current.color.copy(accent);
 
     for (let i = 0; i < city.planets.length; i++) {
       const g = planetRefs.current[i];
@@ -164,11 +172,11 @@ export const Cityscape = () => {
       </instancedMesh>
       <instancedMesh ref={stripsRef} args={[undefined, undefined, city.strips.length]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#c9d6ff" toneMapped={false} />
+        <meshBasicMaterial ref={stripMatRef} color="#c8b273" toneMapped={false} />
       </instancedMesh>
       <instancedMesh ref={roofsRef} args={[undefined, undefined, city.roofs.length]}>
         <boxGeometry args={[1, 1, 1]} />
-        <meshBasicMaterial color="#ffffff" toneMapped={false} />
+        <meshBasicMaterial ref={roofMatRef} color="#c8b273" toneMapped={false} />
       </instancedMesh>
 
       {/* --- playable climb skeleton (fixed RigidBodies) ------------------ */}
