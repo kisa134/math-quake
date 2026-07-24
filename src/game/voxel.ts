@@ -21,7 +21,7 @@ export interface Shatterable {
   position: [number, number, number];
 }
 
-export const DEBRIS_CAP = 256;
+export const DEBRIS_CAP = 384;
 const SMALL_COUNT = 10, CANDLE_COUNT = 18;
 const RADIAL = 12, SCATTER = 8, POP_UP = 6, SPIN = 8;
 const NEON = ['#f72585', '#00f5d4', '#4361ee', '#7209b7', '#4cc9f0', '#b5179e'];

@@ -38,6 +38,8 @@ import { Dragons } from './Dragons';
 import { BuffOrbs } from './BuffOrbs';
 import { Ragdolls } from './Ragdolls';
 import { ShockRings } from './ShockRings';
+import { Euphoria } from './Euphoria';
+import { LowerSwarm } from './LowerSwarm';
 import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
@@ -168,6 +170,8 @@ export const Game = () => {
         <BuffOrbs />
         <Ragdolls />
         <ShockRings />
+        <Euphoria />
+        <LowerSwarm />
         <PhysProps />
         <Totems />
         <ChromeIdols />

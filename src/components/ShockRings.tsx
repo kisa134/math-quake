@@ -9,7 +9,7 @@ import { accent } from '../game/accent';
  * explosion claims one: it expands 1→16u and fades in 0.45s, tinted by the
  * market accent. Pure visual (raycast=noop), 4 draw calls max, zero alloc.
  */
-const POOL = 4;
+const POOL = 6;
 const LIFE = 0.45;
 const NO_RAYCAST = () => {};
 

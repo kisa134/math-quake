@@ -6,7 +6,7 @@ import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
 import { accent } from '../game/accent';
 import { MATTE_INSTANCED, MATTE_WORLD } from '../game/materials';
-import { generateCity, type ClimbPiece, type Inst } from '../game/cityscape';
+import { getCity, type ClimbPiece, type Inst } from '../game/cityscape';
 
 /**
  * WS-A — renders the seeded 1-km cyberpunk city from generateCity().
@@ -119,7 +119,7 @@ const ClimbBody = ({ p }: { p: ClimbPiece }) => {
 // ------------------------------------------------------------- component ----
 
 export const Cityscape = () => {
-  const city = useMemo(() => generateCity(), []);
+  const city = useMemo(() => getCity(), []);
 
   const towersRef = useStaticInstances(city.towers);
   useEffect(() => { _towersMesh = towersRef.current; return () => { _towersMesh = null; }; }, [towersRef]);

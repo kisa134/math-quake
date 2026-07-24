@@ -3,6 +3,7 @@ import {
   hash01, warpTime, conductorState, eventFor, epochBounds,
   LIQ_DUR, COMET_DUR, RESURRECT_DELAY, type ConductorState, type CandleEvent,
 } from './conductor';
+import { formationTargetFor, type FormationState } from './formations';
 
 /**
  * V4.3 «Литургия ликвидаций» — the candle universe core (spec:
@@ -151,6 +152,8 @@ function orbitTheta(c: VoxCandle, tW: number): number {
 
 /** Full living position: orbit + 4 breathing layers + MA bounce + fate
  *  overrides (liquidation spiral / pump comet / resurrection). Zero-alloc. */
+const _ft = { x: 0, y: 0, z: 0 };
+
 export function candleLivePos(
   c: VoxCandle,
   t: number,
@@ -159,6 +162,7 @@ export function candleLivePos(
   ev: CandleEvent,
   data: VoxData,
   out: { x: number; y: number; z: number },
+  form?: FormationState,
 ): CandleStatus {
   let status: CandleStatus = 0;
   let theta = orbitTheta(c, tW);
@@ -214,6 +218,15 @@ export function candleLivePos(
   out.x = BLACK_HOLE.x + x;
   out.y = BLACK_HOLE.y + z0 * c.incSin + yWave;
   out.z = BLACK_HOLE.z + z0 * c.incCos;
+
+  // V7.5 Ц3: formation override — free souls converge into the euphoria figure;
+  // souls with a fate (liq/comet) are the soloists, untouched.
+  if (form && form.active > 0 && ev.type === null) {
+    formationTargetFor(form.fig, c.id, _ft);
+    out.x += (_ft.x - out.x) * form.active;
+    out.y += (_ft.y - out.y) * form.active;
+    out.z += (_ft.z - out.z) * form.active;
+  }
   return status;
 }
 

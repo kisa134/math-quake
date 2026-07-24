@@ -12,6 +12,7 @@ import {
 } from '../game/voxCandles';
 import { orbSpawnInbox, ringInbox } from '../game/botHorde';
 import type { CandleEvent } from '../game/conductor';
+import { formationState } from '../game/formations';
 
 /**
  * V4.3 «Литургия ликвидаций» — the living candle cosmos renderer.
@@ -204,6 +205,10 @@ export const VoxelCandles = () => {
     const t = state.clock.elapsedTime;
     const tW = warpTime(t);
     const cs = conductorState(t);
+    // V7.5 Ц3: euphoria formations — during the figure, update at 1/2 instead
+    // of 1/8 so the shape reads crisp (lerp softens the rest)
+    const form = formationState(t, cs);
+    const rrStep = form.active > 0 ? 2 : 8;
     frame.current = (frame.current + 1) % 8;
     tailTick.current++;
     let touched = false;
@@ -224,7 +229,7 @@ export const VoxelCandles = () => {
         touched = true;
         continue;
       }
-      if (ci % 8 !== frame.current) continue;
+      if (ci % rrStep !== frame.current % rrStep) continue;
       if (aliveCount.current[ci] <= 0 && !hidden.current[ci]) continue; // player-shattered stays dead
 
       // fate: cache per epoch (damaged souls leave the schedule — gameplay first)
@@ -234,7 +239,7 @@ export const VoxelCandles = () => {
         if (!damaged) fateOf(c, t, data, ev);
         else { ev.type = null; }
       }
-      const status = candleLivePos(c, t, tW, cs, damaged ? { type: null, tStart: 0, dur: 0 } : ev, data, _pos);
+      const status = candleLivePos(c, t, tW, cs, damaged ? { type: null, tStart: 0, dur: 0 } : ev, data, _pos, form);
 
       if (status === 2) {
         // SWALLOWED: the donut eats — feed flash + inward crumbs, then digest

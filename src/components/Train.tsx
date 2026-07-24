@@ -6,6 +6,7 @@ import { TRACK_CURVE, TRACK_LENGTH } from '../config/trackSpline';
 import { TRAIN, trainTargetSpeed } from '../config/vehicles';
 import { tag } from '../game/hitTags';
 import { PALETTE } from '../theme';
+import { conductorState } from '../game/conductor';
 
 /**
  * V2 WS-B — the crazy neon cyber-train.
@@ -131,13 +132,14 @@ export const Train = () => {
     [],
   );
 
-  useFrame((_, rawDelta) => {
+  useFrame((fs, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1); // tab-back spike guard
 
     // --- speed profile: sample the loco tangent, chase the target speed ---
     const uLoco = ((dist.current % TRACK_LENGTH) + TRACK_LENGTH) % TRACK_LENGTH / TRACK_LENGTH;
     TRACK_CURVE.getTangentAt(uLoco, _tan);
-    const target = trainTargetSpeed(_tan.y);
+    // V7.5 Ц3: поезд дышит с рынком — быстрее в памп, тяжелее в тишину
+    const target = trainTargetSpeed(_tan.y) * (0.8 + 0.4 * conductorState(fs.clock.elapsedTime).speedNow);
     const dv = THREE.MathUtils.clamp(target - speed.current, -TRAIN.accelRate * delta, TRAIN.accelRate * delta);
     speed.current += dv;
     dist.current += speed.current * delta;

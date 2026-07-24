@@ -190,8 +190,9 @@ export const Cars = () => {
   const lastSmoke = useRef(0);
   const wasDriving = useRef<string | null>(null);
 
-  useFrame((_, rawDelta) => {
+  useFrame((fs, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1);
+    const fsT = fs.clock.elapsedTime;
     const driving = useStore.getState().driving;
 
     // engine shutdown when we hop out by any path
@@ -219,7 +220,28 @@ export const Cars = () => {
       if (!sim) sim = carSim[def.id] = { fwd: 0, lat: 0, steer: 0, thr: 0, hb: false };
 
       if (driving !== def.id) {
-        sim.fwd *= 0.95; sim.lat *= 0.9; sim.steer *= 0.9; sim.thr *= 0.9; sim.hb = false;
+        // V7.5 Ц3: АВТОПИЛОТ-ПАРАД — пустые тачки кружат по деку сами.
+        // Серво к аналитической точке круга = чистая f(t): оба клиента видят
+        // один парад без сети; после броска машина сама возвращается на круг.
+        const idx = CAR_DEFS.indexOf(def);
+        const ph = fsT * 0.25 + idx * 2.1;
+        const R = 24 + idx * 10;
+        const tx = ROAD_DECK.x + Math.cos(ph) * R;
+        const tz = ROAD_DECK.z + Math.sin(ph) * R;
+        if (Math.abs(t.y - (ROAD_DECK_TOP + 1)) < 6) {
+          const vel0 = body.linvel();
+          let dx = tx - t.x, dz = tz - t.z;
+          const d = Math.hypot(dx, dz) || 1;
+          const spd = Math.min(14, d * 2);
+          dx /= d; dz /= d;
+          if (d > 0.4) body.setLinvel({ x: dx * spd, y: vel0.y, z: dz * spd }, true);
+          const targetH = Math.atan2(dx, dz);
+          const diff = Math.atan2(Math.sin(targetH - heading), Math.cos(targetH - heading));
+          body.setAngvel({ x: 0, y: Math.max(-2, Math.min(2, diff * 3)), z: 0 }, true);
+          sim.fwd = spd; sim.lat = 0; sim.steer = Math.max(-1, Math.min(1, diff)); sim.thr = 0.5; sim.hb = false;
+        } else {
+          sim.fwd *= 0.95; sim.lat *= 0.9; sim.steer *= 0.9; sim.thr *= 0.9; sim.hb = false;
+        }
         continue;
       }
 

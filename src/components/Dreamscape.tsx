@@ -36,10 +36,12 @@ export const Dreamscape = () => {
   const obelisks = useMemo(() => {
     const rnd = mulberry32(0xb05c4);
     const list: { pos: [number, number, number]; scale: [number, number, number] }[] = [];
-    for (let i = 0; i < 140; i++) {
+    // V7.5 Ц3: 260 обелисков, теперь и во внутреннем кольце (там ниже —
+    // сайтлайны плиты живы). Тот же 1 draw call, raycast=noop.
+    for (let i = 0; i < 260; i++) {
       const a = rnd() * Math.PI * 2;
-      const r = 700 + rnd() * 2100;
-      const h = 90 + rnd() * 340;
+      const r = 300 + rnd() * 2500;
+      const h = r < 700 ? 50 + rnd() * 110 : 90 + rnd() * 340;
       list.push({ pos: [Math.cos(a) * r, -50 + h / 2, Math.sin(a) * r], scale: [6 + rnd() * 10, h, 6 + rnd() * 10] });
     }
     return list;

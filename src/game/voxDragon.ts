@@ -55,6 +55,21 @@ export function wildDragonPos(d: DragonDef, t: number, out: { x: number; y: numb
       out.x = d.home[0] + Math.cos(a) * rr;
       out.z = d.home[2] + Math.sin(a) * rr;
     }
+    return;
+  }
+  // V7.5 Ц3 ВОЗДУШНОЕ ШОУ: каждые 180с три младших дракона слетаются в
+  // синхронный ромб над Торговым Полом (окно сдвинуто, чтобы не совпадать с
+  // нырком апекса). Чистая f(t) — оба клиента видят одну фигуру.
+  const st = (t + 40) % 180;
+  if (st < 20) {
+    const k = Math.sin((st / 20) * Math.PI);
+    const sa = t * 0.5 + d.id * (Math.PI * 2 / 3);
+    const sx = Math.cos(sa) * 260;
+    const sz = Math.sin(sa) * 260;
+    out.x = out.x * (1 - k) + sx * k;
+    out.y = out.y * (1 - k) + 220 * k;
+    out.z = out.z * (1 - k) + sz * k;
+    out.heading = out.heading * (1 - k) + Math.atan2(Math.cos(sa), -Math.sin(sa)) * k;
   }
 }
 

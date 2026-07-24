@@ -9,6 +9,7 @@ import { ringInbox } from '../game/botHorde';
 import { chron } from '../game/chronicle';
 import { addTrauma } from '../game/shake';
 import { playExplosionSound } from '../utils/audio';
+import { conductorState } from '../game/conductor';
 
 /**
  * V5 C3 — TOTEMS OF VICE: the Synty money-icons return to the WORLD. Ten
@@ -39,6 +40,9 @@ export const Totems = () => {
   const groups = useRef<Array<THREE.Group | null>>(Array(TOTEM_DEFS.length).fill(null));
   const hp = useRef<Float32Array>(new Float32Array(TOTEM_DEFS.length).fill(HP0));
   const deadUntil = useRef<Float64Array>(new Float64Array(TOTEM_DEFS.length));
+
+  const lastEpoch = useRef(-1);
+  const pulseUntil = useRef(0);
 
   useFrame((state) => {
     const now = Date.now();
@@ -73,6 +77,10 @@ export const Totems = () => {
         playExplosionSound();
       }
     }
+    // V7.5 Ц3: смена эпохи — тотемы порока вздрагивают вместе с рынком
+    const csT = conductorState(t);
+    if (csT.epoch !== lastEpoch.current) { lastEpoch.current = csT.epoch; pulseUntil.current = t + 1.2; }
+    const pw = Math.sin(Math.max(0, (pulseUntil.current - t) / 1.2) * Math.PI);
     for (let i = 0; i < TOTEM_DEFS.length; i++) {
       const g = groups.current[i];
       if (!g) continue;
@@ -80,8 +88,8 @@ export const Totems = () => {
       if (!dead && deadUntil.current[i] !== 0) { deadUntil.current[i] = 0; hp.current[i] = HP0; }
       g.visible = !dead;
       if (!dead) {
-        g.rotation.y = t * 0.5 + i;
-        g.position.y = TOTEM_DEFS[i].pos[1] + Math.sin(t * 0.8 + i * 1.3) * 1.2;
+        g.rotation.y = t * 0.5 + i + pw * 0.8;
+        g.position.y = TOTEM_DEFS[i].pos[1] + Math.sin(t * 0.8 + i * 1.3) * (1.2 + pw * 4);
       }
     }
   });

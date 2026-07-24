@@ -66,6 +66,7 @@ export interface CityData {
   climb: ClimbPiece[]; // becomes fixed RigidBodies (≤100)
   planets: PlanetSpot[];
   topY: number;
+  roofSpots: Array<[number, number, number]>; // V7.5: firework launch pads (spur roofs)
 }
 
 // ----------------------------------------------------------------- prng ----
@@ -155,27 +156,30 @@ export function generateCity(seed = CITY_SEED): CityData {
     clusters.push([Math.cos(a) * r, Math.sin(a) * r]);
   }
 
-  const BUILDING_TARGET = 650;
+  // V7.5 Ц3: город приходит В среднее кольцо (350-800 было мёртвой зоной)
+  const BUILDING_TARGET = 780;
   let placed = 0;
   let guard = 0;
   while (placed < BUILDING_TARGET && guard++ < BUILDING_TARGET * 6) {
     let x: number, z: number;
-    if (rnd() < 0.6) {
+    if (rnd() < 0.6 && placed >= 130) {
       const [cx, cz] = clusters[Math.floor(rnd() * clusters.length)];
       x = cx + (rnd() - 0.5) * 450;
       z = cz + (rnd() - 0.5) * 450;
     } else {
       const a = rnd() * Math.PI * 2;
-      const r = 800 + 2000 * Math.pow(rnd(), 0.8);
+      // первые 130 размещений форсируются в пояс 350-800
+      const r = placed < 130 ? 350 + rnd() * 450 : 350 + 2450 * Math.pow(rnd(), 0.8);
       x = Math.cos(a) * r;
       z = Math.sin(a) * r;
     }
     const r = Math.hypot(x, z);
-    if (r < 800 || r > 2800) continue;
+    if (r < 350 || r > 2800) continue;
     if (TEMPLES.some(([tx, tz]) => Math.max(Math.abs(x - tx), Math.abs(z - tz)) < 75)) continue;
 
     let h = 150 + rnd() * rnd() * 600;            // V6: 150–750 base skyline
     if (rnd() < 0.14) h = 1200 + rnd() * 3800;    // V6: supertalls → up to 5000
+    if (r < 700) h = 60 + rnd() * rnd() * 240;    // внутренний пояс низкий — сайтлайны плиты живы
     const w = 30 + rnd() * 60;
     const d = 30 + rnd() * 60;
     addBuilding(x, z, w, h, d, true);
@@ -183,6 +187,7 @@ export function generateCity(seed = CITY_SEED): CityData {
   }
 
   // --- spur rooftops: physics landings on 12 tall buildings (grapple bait) --
+  const roofSpots: Array<[number, number, number]> = [];
   let spurs = 0;
   for (let i = 0; i < towers.length && spurs < 12; i += 7) {
     const t = towers[i];
@@ -200,6 +205,7 @@ export function generateCity(seed = CITY_SEED): CityData {
       ...(ice ? { friction: 1 } : {}),
       ...(metal && !ice ? { isMetal: true } : {}),
     });
+    roofSpots.push([t.pos[0], GROUND_Y + h + 2, t.pos[2]]);
     spurs++;
   }
 
@@ -328,5 +334,10 @@ export function generateCity(seed = CITY_SEED): CityData {
     (isBull ? bulls : bears).push(candle);
   }
 
-  return { towers, strips, roofs, bulls, bears, climb, planets, topY };
+  return { towers, strips, roofs, bulls, bears, climb, planets, topY, roofSpots };
 }
+
+// V7.5 Ц3: module-cached seeded city — Euphoria/LowerSwarm read the SAME data
+// the renderer uses (one seed → both clients identical).
+let _city: CityData | null = null;
+export const getCity = (): CityData => (_city ??= generateCity());

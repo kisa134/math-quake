@@ -14,7 +14,7 @@ import { playImpactSound, playExplosionSound } from '../utils/audio';
  * InstancedMesh. No per-chunk RigidBody, no per-frame React state, no allocs in
  * the loop. See docs/increments/02-voxel-destruction.md.
  */
-const CAP = 256;
+const CAP = 384;
 const GRAVITY = 30;
 const FLOOR_Y = -50;
 const FADE = 0.6;

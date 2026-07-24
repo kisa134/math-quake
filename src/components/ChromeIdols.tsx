@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
+import { conductorState } from '../game/conductor';
 
 /**
  * V5 Wave C — THE CHROME IDOLS: the owner's three forge3d drops, meshopt'd
@@ -23,18 +24,27 @@ const SPOTS: { asset: string; pos: [number, number, number]; scale: number }[] =
 export const ChromeIdols = () => {
   const groups = useRef<Array<THREE.Group | null>>(Array(SPOTS.length).fill(null));
   const patched = useRef<boolean[]>(Array(SPOTS.length).fill(false));
+  const lastEpoch = useRef(-1);
+  const burstUntil = useRef(0);
+  const extra = useRef(0);
 
-  useFrame((state) => {
+  useFrame((state, dt) => {
     const t = state.clock.elapsedTime;
+    // V7.5 Ц3: epoch turn → the carousel bursts into a 2s faster spin
+    const cs = conductorState(t);
+    if (cs.epoch !== lastEpoch.current) { lastEpoch.current = cs.epoch; burstUntil.current = t + 2; }
+    const bk = Math.max(0, (burstUntil.current - t) / 2);
+    extra.current += bk * dt * 1.5;
+    const bw = Math.sin(bk * Math.PI);
     for (let i = 0; i < SPOTS.length; i++) {
       const g = groups.current[i];
       if (!g) continue;
       // carousel: the triptych orbits its shared axis (MONUMENT II)
-      const a = t * 0.25 + (i / SPOTS.length) * Math.PI * 2;
+      const a = t * 0.25 + extra.current + (i / SPOTS.length) * Math.PI * 2;
       g.position.x = CAROUSEL.x + Math.cos(a) * CAROUSEL.r;
       g.position.z = CAROUSEL.z + Math.sin(a) * CAROUSEL.r;
       g.rotation.y = t * 0.4 + i;
-      g.position.y = CAROUSEL.y + Math.sin(t * 0.5 + i * 2.1) * 4;
+      g.position.y = CAROUSEL.y + Math.sin(t * 0.5 + i * 2.1) * (4 + bw * 8);
       if (!patched.current[i]) {
         let found = false;
         g.traverse((o) => {
