@@ -139,6 +139,8 @@ export const BotHorde = () => {
         const r = 8 + Math.random() * 22;
         const bot = makeBot(mut, anchor[0] + Math.cos(a) * r, anchor[1] + 4, anchor[2] + Math.sin(a) * r);
         bots.current.push(bot);
+        // V6 Ш5 спавн-театр: каждое явление отмечено кольцом (жерло дышит)
+        ringInbox.push({ x: bot.x, y: bot.y + 0.5, z: bot.z });
       }
       // reassign slots compactly
       slotOf.current.clear();

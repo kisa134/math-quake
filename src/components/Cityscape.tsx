@@ -156,7 +156,12 @@ export const Cityscape = () => {
       if (!g) continue;
       const p = city.planets[i];
       g.rotation.y += p.spin * dt;
-      g.position.y = p.pos[1] + Math.sin(t * 0.11 + i * 1.7) * 4; // slow bob
+      // V6 Ш5: планеты ЖИВУТ — медленные орбиты вокруг пончика (ничего не висит)
+      const orbR = Math.hypot(p.pos[0], p.pos[2]);
+      const orbA = Math.atan2(p.pos[2], p.pos[0]) + t * (0.008 + i * 0.003);
+      g.position.x = Math.cos(orbA) * orbR;
+      g.position.z = Math.sin(orbA) * orbR;
+      g.position.y = p.pos[1] + Math.sin(t * 0.11 + i * 1.7) * 12;
 
       // One-time: once the Suspense-loaded GLB meshes exist, silence their
       // triangle-level raycast (tens of thousands of tris tested by the

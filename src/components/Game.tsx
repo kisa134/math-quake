@@ -108,6 +108,7 @@ const GameManager = () => {
           const total = wavesSize(r.num);
           const botCount = Math.round(total * 0.7);
           spawnBotWave(botCount, r.num);
+          chron('⚠ ЖЕРЛО ОТКРЫЛОСЬ — волна ' + r.num);
           spawnLeft.current = total - botCount;
         }
       } else {

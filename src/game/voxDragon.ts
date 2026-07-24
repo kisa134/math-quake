@@ -40,10 +40,22 @@ export const DRAGONS: DragonDef[] = [
 export function wildDragonPos(d: DragonDef, t: number, out: { x: number; y: number; z: number; heading: number }) {
   const a = d.phase + t * d.circleSpeed;
   out.x = d.home[0] + Math.cos(a) * d.circleR;
-  out.y = d.home[1] + Math.sin(a * 0.7) * 8;
+  out.y = d.home[1] + Math.sin(a * 0.7) * 8 * d.scale;
   out.z = d.home[2] + Math.sin(a) * d.circleR;
   // heading = tangent of the circle
   out.heading = Math.atan2(-Math.sin(a), Math.cos(a));
+  // V6 Ш5 микросценка: раз в 3 цикла (225с) АПЕКС ныряет НИЗКО над Полом —
+  // тень маркетмейкера накрывает арену (детерминировано, оба клиента видят)
+  if (d.id === 3) {
+    const ct = t % 225;
+    if (ct < 16) {
+      const k = Math.sin((ct / 16) * Math.PI); // плавно вниз и обратно
+      out.y = out.y * (1 - k) + 150 * k;
+      const rr = d.circleR * (1 - k * 0.85);   // и почти к центру
+      out.x = d.home[0] + Math.cos(a) * rr;
+      out.z = d.home[2] + Math.sin(a) * rr;
+    }
+  }
 }
 
 // ---- live state (event-sourced across peers) --------------------------------
