@@ -86,7 +86,8 @@ function mulberry32(seed: number) {
 // Mirrors src/theme.ts (kept local so cityscape stays a dependency-free pure
 // module). World = cold set only.
 // V3 Bosch-psychedelia: wine/gold/forest (owner reference boards)
-const NEON = ['#ff4d6d', '#e9c46a', '#c9184a', '#f4a261', '#2fbf71', '#ff758f'];
+// V4.1 digital maximalism: acid/toxic greens join the wine/gold — кислота в неон
+const NEON = ['#ff4d6d', '#e9c46a', '#c9184a', '#f4a261', '#2fbf71', '#ff758f', '#39ff14', '#adff2f'];
 const TOWER_TINTS = ['#2a0f14', '#33121c', '#1d1410', '#22182a', '#141b14', '#2c101d'];
 const COLD = ['#6d1a36', '#a4133c', '#9d174d', '#e9c46a', '#2fbf71', '#c9184a'];
 const ICE_COLOR = '#e8e0d0';

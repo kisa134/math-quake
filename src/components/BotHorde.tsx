@@ -10,7 +10,7 @@ import { playExplosionSound, playImpactSound } from '../utils/audio';
 import { getDudeParts, JOINTS, makeGore } from '../game/voxHumanoid';
 import {
   MUTATIONS, MUT_BY_ID, rollMutation, makeBot, botHitInbox, botFxInbox, netBots,
-  BOT_CAP, type Bot,
+  orbSpawnInbox, BOT_CAP, type Bot,
 } from '../game/botHorde';
 import { creatureLive, creatureHitInbox } from '../game/creatureNet';
 
@@ -149,6 +149,8 @@ export const BotHorde = () => {
     playExplosionSound();
     // close-range kill → red HUD flash (the brutality register)
     if (camera.position.distanceToSquared(new THREE.Vector3(b.x, b.y, b.z)) < 12 * 12) fireKillFlash();
+    // dopamine: 14% chance the corpse drops a buff orb (personal loot)
+    if (Math.random() < 0.14) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
     slotOf.current.delete(b.id);

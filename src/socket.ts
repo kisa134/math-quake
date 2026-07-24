@@ -6,6 +6,7 @@ import { voxInbox } from './game/voxCandles';
 import { roundWinReward } from './config/economy';
 import { goreInbox } from './game/voxHumanoid';
 import { botHitInbox, botFxInbox, netBots } from './game/botHorde';
+import { applyDragonHit, dragonState, dragonFxInbox, DRAGONS } from './game/voxDragon';
 
 /**
  * Multiplayer transport — Supabase Realtime broadcast, peer-to-peer style (no
@@ -101,6 +102,25 @@ export const initMultiplayer = (roomId: string) => {
     if (useStore.getState().isHost) {
       useStore.getState().damageEnemy(payload.id, payload.damage, payload.point);
     }
+  });
+
+  // --- V4.1 dragons: event-sourced HP + mount state (wild flight is analytic) ---
+  channel.on('broadcast', { event: 'dhit' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (applyDragonHit(payload.id, payload.damage)) {
+      const d = DRAGONS[payload.id];
+      if (d && payload.x !== undefined) dragonFxInbox.push({ x: payload.x, y: payload.y, z: payload.z, scale: d.scale });
+      // if I was riding it — I fall
+      if (useStore.getState().ridingDragon === payload.id) useStore.getState().setRidingDragon(null);
+    }
+  });
+  channel.on('broadcast', { event: 'dmount' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (dragonState[payload.id]) dragonState[payload.id].riddenBy = payload.from;
+  });
+  channel.on('broadcast', { event: 'ddismount' }, ({ payload }) => {
+    if (!payload || payload.from === myId) return;
+    if (dragonState[payload.id]) dragonState[payload.id].riddenBy = null;
   });
 
   // --- V4 bot horde: host-authoritative, peers mirror + relay hits ---

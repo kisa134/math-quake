@@ -23,6 +23,9 @@ import { tryTame, damageCreature } from './Creatures';
 import { makeFlames } from '../game/voxel';
 import { carveVoxCandle, getVoxCandlePos, voxCandleAlive } from './VoxelCandles';
 import { botHitInbox } from '../game/botHorde';
+import { tryMountDragon, dragonRide } from './Dragons';
+import { DRAGONS, dragonAlive, applyDragonHit, dragonFxInbox, RAINBOW, FOAM } from '../game/voxDragon';
+import { makeFlames as makePixelFlames } from '../game/voxel';
 
 const JUMP_FORCE = 15;
 
@@ -106,6 +109,10 @@ export const Player = () => {
   // V4 CS gunfeel: spray index + minigun heat
   const sprayIdx = useRef(0);
   const heatRef = useRef(0);
+  // V4.1 dragon flight
+  const flightVel = useRef(new THREE.Vector3());
+  const lastCannon = useRef(0);
+  const cannonTick = useRef(0);
 
   // jetpack (double-tap space)
   const jetOn = useRef(false);
@@ -158,6 +165,8 @@ export const Player = () => {
           }
           return;
         }
+        // dragon second: mount/dismount the beast (V4.1)
+        if (p && tryMountDragon(p.x, p.y, p.z)) return;
         tryTame(camera, scene);
         return;
       }
@@ -252,6 +261,111 @@ export const Player = () => {
         }
       }
       return; // skip everything on-foot
+    }
+
+    // ---- V4.1: DRAGON FLIGHT. You are the god now. WASD aims with the camera,
+    // W surges, Space climbs, S brakes; LMB = RAINBOW MEGA-CANNON with foam. ----
+    const ridingId = useStore.getState().ridingDragon;
+    if (ridingId !== null) {
+      if (!dragonAlive(ridingId)) {
+        useStore.getState().setRidingDragon(null); // shot out from under you
+      } else {
+        const def = DRAGONS[ridingId];
+        camera.getWorldDirection(_recoilVec); // full 3D aim = flight dir
+        const thrust = keys.forward ? 1 : keys.backward ? -0.35 : 0.12;
+        _velFull.set(
+          _recoilVec.x * def.speed * thrust,
+          _recoilVec.y * def.speed * thrust + (keys.jump ? 11 : 0),
+          _recoilVec.z * def.speed * thrust,
+        );
+        flightVel.current.lerp(_velFull, Math.min(1, delta * 2.6));
+        dragonRide.x += flightVel.current.x * delta;
+        dragonRide.y = Math.max(-30, dragonRide.y + flightVel.current.y * delta);
+        dragonRide.z += flightVel.current.z * delta;
+        dragonRide.heading = cameraYaw(camera);
+        dragonRide.pitch = -_recoilVec.y;
+        dragonRide.active = true;
+        playerRef.current.setTranslation({ x: dragonRide.x, y: dragonRide.y + 1.6 * def.scale, z: dragonRide.z }, true);
+        playerRef.current.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        if (weaponRef.current) weaponRef.current.visible = false;
+        // chase cam behind the beast
+        _camTarget.set(
+          dragonRide.x - _recoilVec.x * 9 * def.scale,
+          dragonRide.y + 3.2 * def.scale,
+          dragonRide.z - _recoilVec.z * 9 * def.scale,
+        );
+        camera.position.lerp(_camTarget, Math.min(1, delta * 6));
+
+        // RAINBOW MEGA-CANNON: hue-cycling lance + foam at the impact
+        const nowMs = performance.now();
+        if (keys.shoot && nowMs - lastCannon.current > 100) {
+          lastCannon.current = nowMs;
+          cannonTick.current++;
+          const hue = RAINBOW[cannonTick.current % RAINBOW.length];
+          raycaster.current.setFromCamera(_center2, camera);
+          raycaster.current.far = 260;
+          const hits = raycaster.current.intersectObjects(scene.children, true);
+          raycaster.current.far = Infinity;
+          for (const h of hits) {
+            const ud = h.object.userData;
+            let o: THREE.Object3D | null = h.object;
+            let pid: string | null = null;
+            while (o) { if (o.userData?.isEnemy && o.userData?.isPlayer) { pid = o.userData.id; break; } o = o.parent; }
+            const dmg = 26;
+            if (ud?.isBot) {
+              if (useStore.getState().isHost) botHitInbox.push({ id: +ud.id, damage: dmg });
+              else socket.emit('bhit', { id: +ud.id, damage: dmg });
+            } else if (ud?.isCreature) damageCreature(ud.id, dmg);
+            else if (ud?.isVoxCandle) carveVoxCandle(+ud.id, h.point.x, h.point.y, h.point.z, 2.6);
+            else if (pid) socket.emit('hit', { targetId: pid, damage: dmg });
+            else if (ud?.isEnemy && ud.id) {
+              if (useStore.getState().isHost) useStore.getState().damageEnemy(ud.id, dmg, [h.point.x, h.point.y, h.point.z]);
+              else socket.emit('ehit', { id: ud.id, damage: dmg, point: [h.point.x, h.point.y, h.point.z] });
+            } else if (!ud?.isFloor && !ud?.isWall && !ud?.isJumpPad) continue;
+            // FOAM + rainbow burn at the impact point
+            useStore.getState().addDebris(makePixelFlames([h.point.x, h.point.y, h.point.z], hue, 5));
+            useStore.getState().addDebris([0, 1, 2].map(() => ({
+              x: h.point.x, y: h.point.y, z: h.point.z,
+              vx: (Math.random() - 0.5) * 5, vy: 3 + Math.random() * 4, vz: (Math.random() - 0.5) * 5,
+              color: FOAM[Math.floor(Math.random() * FOAM.length)],
+              size: 0.16 + Math.random() * 0.18,
+              rx: Math.random() * 6, ry: Math.random() * 6, rz: Math.random() * 6,
+              life: 700 + Math.random() * 500,
+            })));
+            useStore.getState().addMoney(dmg * ECON.moneyPerDamage);
+            _endPoint.copy(h.point);
+            break;
+          }
+          // the lance itself (reuses the shared laser line, hue-cycled + fat)
+          if (laserRef.current) {
+            laserRef.current.visible = true;
+            const mat = laserRef.current.material as THREE.LineBasicMaterial;
+            mat.color.set(hue);
+            mat.opacity = 0.95;
+            const positions = laserRef.current.geometry.attributes.position.array as Float32Array;
+            positions[0] = dragonRide.x; positions[1] = dragonRide.y + 0.4; positions[2] = dragonRide.z;
+            positions[3] = _endPoint.x; positions[4] = _endPoint.y; positions[5] = _endPoint.z;
+            laserRef.current.geometry.attributes.position.needsUpdate = true;
+          }
+          addTrauma(0.05);
+          playShootSound(90 * (0.9 + Math.random() * 0.2), 0.08);
+        }
+
+        // net sync — my position IS the dragon
+        const tS = performance.now();
+        if (roomId && tS - lastSyncTime.current > 50) {
+          lastSyncTime.current = tS;
+          socket.emit('update', {
+            x: dragonRide.x, y: dragonRide.y + 1.2, z: dragonRide.z,
+            rotation: dragonRide.heading, isShooting: keys.shoot, currentWeapon,
+            minions: useStore.getState().localMinions,
+            avatar: useStore.getState().avatarId,
+            money: useStore.getState().money,
+            dragon: ridingId,
+          });
+        }
+        return; // skip everything on-foot
+      }
     }
 
     // Movement
@@ -447,9 +561,10 @@ export const Player = () => {
       }
     }
 
-    // V4: the minigun owns your legs — firing it slows the walk
+    // V4: the minigun owns your legs — firing it slows the walk; SURGE buff lifts them
     const wcfgSlow = WEAPONS[currentWeapon].slow;
-    const slowMul = keys.shoot && !editorMode && wcfgSlow ? wcfgSlow : 1;
+    const surgeMul = useStore.getState().buffs.surge > Date.now() ? 1.35 : 1;
+    const slowMul = (keys.shoot && !editorMode && wcfgSlow ? wcfgSlow : 1) * surgeMul;
     if (grounded && !didJump) {
       applyFriction(_moveVel, delta, groundFriction); // WS-4: ice decks stay slippery
       accelerate(_moveVel, _wishDir, hasInput ? MOVE.maxGroundSpeed * slowMul : 0, MOVE.groundAccel, delta);
@@ -616,7 +731,8 @@ export const Player = () => {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;
     if (now - lastShootTime > 260) sprayIdx.current = 0; // let go → pattern resets
-    const effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
+    let effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
+    if (useStore.getState().buffs.rage > Date.now()) effRate /= 1.6; // RAGE: тратата быстрее
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
       setLastShootTime(now);
@@ -800,6 +916,18 @@ export const Player = () => {
             let obj: THREE.Object3D | null = hitObj.object;
             let isHit = false;
             while (obj) {
+              if (obj.userData?.isDragon) {
+                const did = +obj.userData.id;
+                if (useStore.getState().ridingDragon !== did) { // не пили свою лошадь
+                  const killed = applyDragonHit(did, config.damage);
+                  socket.emit('dhit', { id: did, damage: config.damage, x: hitObj.point.x, y: hitObj.point.y, z: hitObj.point.z });
+                  useStore.getState().addDebris(makeGore(hitObj.point.x, hitObj.point.y, hitObj.point.z, 8, 9));
+                  useStore.getState().addMoney(config.damage * ECON.moneyPerDamage);
+                  if (killed) dragonFxInbox.push({ x: hitObj.point.x, y: hitObj.point.y, z: hitObj.point.z, scale: DRAGONS[did].scale });
+                  anyEnemyHit = true; hitEnemy = true;
+                }
+                isHit = true; break;
+              }
               if (obj.userData?.isBot) {
                 const bid = +obj.userData.id;
                 if (useStore.getState().isHost) botHitInbox.push({ id: bid, damage: config.damage });
@@ -928,7 +1056,8 @@ export const Player = () => {
         currentWeapon: currentWeapon,
         minions: useStore.getState().localMinions,
         avatar: useStore.getState().avatarId,
-        money: useStore.getState().money
+        money: useStore.getState().money,
+        dragon: null
       });
     }
   });

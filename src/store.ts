@@ -77,6 +77,7 @@ interface PlayerState {
   minions?: {x: number, y: number, z: number}[];
   avatar?: string; // selected third-person figure (WS-5)
   money?: number;  // V4 TOP BAG leaderboard
+  dragon?: number | null; // V4.1: dragon id this player is riding
 }
 
 interface GameState {
@@ -108,6 +109,11 @@ interface GameState {
   ownedWeapons: boolean[];   // by WEAPONS index; free loadout owned from start
   buyMenuOpen: boolean;
   round: { num: number; phase: 'buy' | 'wave'; until: number }; // until = Date.now() ms deadline (buy phase)
+  // V4.1: dragon riding + dopamine buffs (timestamps = active until)
+  ridingDragon: number | null;
+  buffs: { rage: number; surge: number; midas: number };
+  setRidingDragon: (id: number | null) => void;
+  setBuff: (b: 'rage' | 'surge' | 'midas', until: number) => void;
   // Neutral creatures (V2 WS-E): host sims `creatures`, peers mirror `netCreatures`
   creatures: Creature[];
   netCreatures: Creature[];
@@ -189,6 +195,8 @@ export const useStore = create<GameState>((set) => ({
   spellWheelOpen: false,
   avatarId: 'skull',
   driving: null,
+  ridingDragon: null,
+  buffs: { rage: 0, surge: 0, midas: 0 },
   money: ECON.startMoney,
   ownedWeapons: WEAPON_PRICES.map((p) => p === 0), // free loadout: wand + dagger
   buyMenuOpen: false,
@@ -355,7 +363,13 @@ export const useStore = create<GameState>((set) => ({
   setSpellWheel: (open) => set({ spellWheelOpen: open }),
   setAvatar: (id) => set({ avatarId: id }),
   setDriving: (id) => set({ driving: id }),
-  addMoney: (n) => set((s) => ({ money: Math.min(ECON.maxMoney, Math.max(0, s.money + n)) })),
+  setRidingDragon: (id) => set({ ridingDragon: id }),
+  setBuff: (b, until) => set((s) => ({ buffs: { ...s.buffs, [b]: until } })),
+  // MIDAS buff doubles the gold flowing IN (never the losses)
+  addMoney: (n) => set((s) => {
+    const gain = n > 0 && s.buffs.midas > Date.now() ? n * 2 : n;
+    return { money: Math.min(ECON.maxMoney, Math.max(0, s.money + gain)) };
+  }),
   buyWeapon: (index) => set((s) => {
     const price = WEAPON_PRICES[index];
     if (price === undefined || s.ownedWeapons[index] || s.money < price) return s;

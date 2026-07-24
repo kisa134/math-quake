@@ -1,5 +1,7 @@
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { Physics } from '@react-three/rapier';
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { Arena } from './Arena';
 import { Cityscape } from './Cityscape';
 import { Player } from './Player';
@@ -26,6 +28,8 @@ import { socket } from '../socket';
 import { MATCH, wavesSize, roundWinReward } from '../config/economy';
 import { BotHorde } from './BotHorde';
 import { spawnBotWave, aliveBotCount } from './BotHorde';
+import { Dragons } from './Dragons';
+import { BuffOrbs } from './BuffOrbs';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -33,6 +37,20 @@ import { spawnBotWave, aliveBotCount } from './BotHorde';
  * everyone gets the win bonus → next BUY. Peers mirror phase via 'round' and
  * pay themselves the bonus on 'roundwin' (money is client-local like HP).
  */
+/** V4.1 digital-maximalism CHROME: a procedural environment map (no network,
+ *  no HDR download) so every metallic surface actually REFLECTS — instant
+ *  hrom-glянец across towers, weapons, dragons. One-time PMREM bake. */
+const ChromeEnv = () => {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04);
+    scene.environment = env.texture;
+    return () => { scene.environment = null; env.texture.dispose(); pmrem.dispose(); };
+  }, [gl, scene]);
+  return null;
+};
+
 const GameManager = () => {
   const { isPlaying, isHost } = useStore();
   const spawnLeft = useRef(0);
@@ -92,6 +110,7 @@ export const Game = () => {
       dpr={[1, 1.5]}
     >
       <fog attach="fog" args={[PALETTE.voidDeep, 200, 1800]} />
+      <ChromeEnv />
       <Physics gravity={[0, -30, 0]}>
         <GameManager />
         {/* V3 Bosch grade: wine ambient + antique-gold key light (moonlight) */}
@@ -113,6 +132,8 @@ export const Game = () => {
         <Enemies />
         <NetEnemies />
         <BotHorde />
+        <Dragons />
+        <BuffOrbs />
         <Creatures />
         <WorldEntities />
         <Train />

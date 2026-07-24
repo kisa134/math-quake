@@ -14,15 +14,16 @@ export const VOXEL = 0.14;              // one body voxel (world units)
 export type LimbBit = 0 | 1 | 2 | 3 | 4; // head, armL, armR, legL, legR
 export const LIMB = { head: 0, armL: 1, armR: 2, legL: 3, legR: 4 } as const;
 
-/** Merged grid-of-cubes geometry (tiny gaps → the voxel read). */
-function voxGrid(w: number, h: number, d: number, ox: number, oy: number, oz: number): THREE.BufferGeometry {
-  const cube = VOXEL * 0.92;
+/** Merged grid-of-cubes geometry (tiny gaps → the voxel read). Exported for
+ *  the voxel dragon (game/voxDragon.ts) — same construction language. */
+export function voxGrid(w: number, h: number, d: number, ox: number, oy: number, oz: number, voxel = VOXEL): THREE.BufferGeometry {
+  const cube = voxel * 0.92;
   const parts: THREE.BufferGeometry[] = [];
   for (let x = 0; x < w; x++)
     for (let y = 0; y < h; y++)
       for (let z = 0; z < d; z++) {
         const g = new THREE.BoxGeometry(cube, cube, cube);
-        g.translate(ox + (x + 0.5) * VOXEL, oy + (y + 0.5) * VOXEL, oz + (z + 0.5) * VOXEL);
+        g.translate(ox + (x + 0.5) * voxel, oy + (y + 0.5) * voxel, oz + (z + 0.5) * voxel);
         parts.push(g);
       }
   const merged = mergeGeometries(parts);

@@ -68,6 +68,7 @@ export const UI = () => {
 
           <Hitmarker />
           <KillFlash />
+          <BuffBadges />
           <SpellWheel />
           <BuyMenu />
 
@@ -139,6 +140,44 @@ export const UI = () => {
       )}
 
       {/* V3.2: all player bodies are the white voxel dude — picker retired */}
+    </div>
+  );
+};
+
+// V4.1 dopamine buffs — active-buff badges with live countdowns.
+const BUFF_META: Record<string, { label: string; color: string }> = {
+  rage: { label: '🔥 RAGE ×1.6', color: '#e63946' },
+  surge: { label: '⚡ SURGE ×1.35', color: '#00b4d8' },
+  midas: { label: '👑 MIDAS ×2$', color: '#ffd166' },
+};
+
+const BuffBadges = () => {
+  const buffs = useStore((s) => s.buffs);
+  const [, force] = useState(0);
+  const any = buffs.rage > Date.now() || buffs.surge > Date.now() || buffs.midas > Date.now();
+  useEffect(() => {
+    if (!any) return;
+    const iv = setInterval(() => force((x) => x + 1), 500);
+    return () => clearInterval(iv);
+  }, [any]);
+  if (!any) return null;
+  const now = Date.now();
+  return (
+    <div className="absolute left-1/2 -translate-x-1/2 top-[68%] flex gap-2 pointer-events-none">
+      {(Object.keys(BUFF_META) as Array<keyof typeof buffs>).map((k) => {
+        const until = buffs[k];
+        if (until <= now) return null;
+        const meta = BUFF_META[k];
+        return (
+          <div
+            key={k}
+            className="px-2 py-1 text-[11px] font-mono font-bold uppercase tracking-widest border"
+            style={{ color: meta.color, borderColor: meta.color, textShadow: `0 0 8px ${meta.color}` }}
+          >
+            {meta.label} · {Math.ceil((until - now) / 1000)}s
+          </div>
+        );
+      })}
     </div>
   );
 };

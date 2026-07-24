@@ -80,6 +80,8 @@ export function makeBot(mut: MutationSpec, x: number, y: number, z: number): Bot
 // ---- cross-module inboxes (socket/Player push, BotHorde drains) -------------
 export const botHitInbox: { id: number; damage: number }[] = [];
 export const botFxInbox: { x: number; y: number; z: number; big: boolean }[] = [];
+// V4.1 dopamine: bot deaths sometimes drop a personal buff orb (client-local loot)
+export const orbSpawnInbox: { x: number; y: number; z: number }[] = [];
 
 // Non-host mirror snapshot (socket writes, BotHorde renders when !isHost)
 export interface NetBot {
