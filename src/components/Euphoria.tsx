@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import { useStore } from '../store';
 import { conductorState, epochBounds, hash01 } from '../game/conductor';
 import { getCity } from '../game/cityscape';
+import { worldT } from '../game/worldClock';
 import { makeFlames } from '../game/voxel';
 import { ringInbox } from '../game/botHorde';
 
@@ -26,7 +27,7 @@ export const Euphoria = () => {
   const mask = useRef(0);             // bitmask of salvos already fired
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6: salvos fire simultaneously for everyone
     const cs = conductorState(t);
     if (cs.epoch !== 2) return;
     if (fired.current !== cs.epochIdx) { fired.current = cs.epochIdx; mask.current = 0; }

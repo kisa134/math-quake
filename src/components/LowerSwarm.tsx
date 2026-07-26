@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getCity } from '../game/cityscape';
 import { audioReactive } from '../game/audioReactive';
+import { worldT } from '../game/worldClock';
 
 /**
  * V7.5 Ц3 — THE LOWER SWARM: generateCity's 320 decorative bull/bear candles
@@ -61,7 +62,7 @@ export const LowerSwarm = () => {
   useFrame((state) => {
     const m = ref.current;
     if (!m) return;
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     // V7.6: the lower swarm glows harder on the track's bass
     if (matRef.current) matRef.current.emissiveIntensity = 0.4 + audioReactive.bass * 0.5;
     frame.current = (frame.current + 1) % 4;

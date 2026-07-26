@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { accent } from '../game/accent';
 import { audioReactive } from '../game/audioReactive';
+import { worldT } from '../game/worldClock';
 
 /**
  * V7.6 М3 — THE UPPER SWARM: more figures flying in the high sky (y 500-1300,
@@ -68,7 +69,7 @@ export const UpperSwarm = () => {
   useFrame((state) => {
     const m = ref.current;
     if (!m) return;
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     if (matRef.current) {
       matRef.current.color.copy(accent);
       matRef.current.emissiveIntensity = 0.25 + audioReactive.bass * 0.4;

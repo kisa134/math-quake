@@ -5,6 +5,7 @@ import { BLACK_HOLE, conductorState } from '../game/voxCandles';
 import { blackHoleFeed, blackHoleSuck } from './VoxelCandles';
 import { accent } from '../game/accent';
 import { audioReactive } from '../game/audioReactive';
+import { worldT, wrapPhase } from '../game/worldClock';
 
 /**
  * V6 — THE VILLAIN DONUT. Абсолютно чёрное тело (свет не существует внутри),
@@ -106,7 +107,7 @@ export const BlackHole = () => {
   }, []);
 
   useFrame((state, dt) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6: the god beats identically for every client
     const cs = conductorState(t);
     blackHoleFeed.v = Math.max(0, blackHoleFeed.v - blackHoleFeed.v * 2 * dt);
     // V7.6 М2: suction decays slower (~1.5s half-life) — the cinematic inhale
@@ -116,10 +117,11 @@ export const BlackHole = () => {
       mawLightRef.current.intensity = suck * 9;
       mawLightRef.current.distance = 1400;
     }
-    (rimMat.uniforms.uHeart as { value: number }).value = cs.heartPhase;
+    // float32 uniform: wrap the accumulated phase (exact — PH_CYCLE = 114.0)
+    (rimMat.uniforms.uHeart as { value: number }).value = wrapPhase(cs.heartPhase);
     // V7.6: the villain rim breathes with the track's bass (on top of feed flash)
     (rimMat.uniforms.uFeed as { value: number }).value = blackHoleFeed.v + audioReactive.bass * 0.6;
-    (diskMat.uniforms.uTime as { value: number }).value = t;
+    (diskMat.uniforms.uTime as { value: number }).value = t % 3600; // float32-safe wrap
     ((diskMat.uniforms.uAccent as { value: THREE.Color }).value).copy(accent);
     if (groupRef.current) {
       groupRef.current.rotation.y += dt * 0.05 * (1 + 0.5 * Math.abs(cs.S));

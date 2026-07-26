@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store';
 import { marketNow } from '../game/market';
 import {
-  dayIndex, dayT, BELL_AT, LAST_HOUR_AT,
+  dayIndex, dayT, BELL_AT, LAST_HOUR_AT, displayDay,
   dayStats, resetDay, titleFor, type DayStats,
 } from '../game/tradingDay';
 import { chron } from '../game/chronicle';
@@ -46,7 +46,7 @@ export const ClosingBell = () => {
         curDay.current = d;
         belled.current = false;
         resetDay(d);
-        chron(`▸ ДЕНЬ ${d + 1} — РЫНОК ОТКРЫТ`);
+        chron(`▸ ДЕНЬ ${displayDay(d)} — РЫНОК ОТКРЫТ`);
       }
       force((x) => x + 1);
     }, 250);
@@ -81,7 +81,7 @@ export const ClosingBell = () => {
         <div className="absolute inset-x-0 top-[18%] flex justify-center pointer-events-none z-20">
           <div className="font-black text-3xl tracking-[0.4em] uppercase px-6 py-2 bg-black/60 border border-amber-300/40"
                style={{ color: '#e9c46a', textShadow: '0 0 22px #e9c46a' }}>
-            ▸ ДЕНЬ {day + 1} — РЫНОК ОТКРЫТ
+            ▸ ДЕНЬ {displayDay(day)} — РЫНОК ОТКРЫТ
           </div>
         </div>
       )}
@@ -112,7 +112,7 @@ export const ClosingBell = () => {
              style={{ background: 'radial-gradient(circle at center, rgba(0,0,0,0.55), rgba(0,0,0,0.85))' }}>
           <div className="flex flex-col items-center gap-4 px-10 py-8 bg-black/80 border border-amber-300/30 min-w-[440px]">
             <div className="font-black text-2xl tracking-[0.35em] uppercase text-white">
-              ДЕНЬ {report.day + 1} ЗАКРЫТ
+              ДЕНЬ {displayDay(report.day)} ЗАКРЫТ
             </div>
             {/* podium */}
             <div className="flex flex-col gap-1 w-full">

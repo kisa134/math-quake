@@ -2,6 +2,7 @@ import { useMemo, useRef, useLayoutEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { getCity } from '../game/cityscape';
+import { worldT } from '../game/worldClock';
 
 /**
  * V8.5 П4 — THE HIGH SWARM RETURNS. The owner asked for the old BIG candles
@@ -46,7 +47,7 @@ export const HighSwarm = () => {
   useFrame((state) => {
     const m = ref.current;
     if (!m) return;
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     frame.current = (frame.current + 1) % 4;
     for (let i = frame.current; i < swarm.length; i += 4) {
       const c = swarm[i];

@@ -7,6 +7,7 @@ import { TRAIN, trainTargetSpeed } from '../config/vehicles';
 import { tag } from '../game/hitTags';
 import { PALETTE } from '../theme';
 import { conductorState } from '../game/conductor';
+import { worldT } from '../game/worldClock';
 
 /**
  * V2 WS-B — the crazy neon cyber-train.
@@ -139,7 +140,7 @@ export const Train = () => {
     const uLoco = ((dist.current % TRACK_LENGTH) + TRACK_LENGTH) % TRACK_LENGTH / TRACK_LENGTH;
     TRACK_CURVE.getTangentAt(uLoco, _tan);
     // V7.5 Ц3: поезд дышит с рынком — быстрее в памп, тяжелее в тишину
-    const target = trainTargetSpeed(_tan.y) * (0.8 + 0.4 * conductorState(fs.clock.elapsedTime).speedNow);
+    const target = trainTargetSpeed(_tan.y) * (0.8 + 0.4 * conductorState(worldT()).speedNow);
     const dv = THREE.MathUtils.clamp(target - speed.current, -TRAIN.accelRate * delta, TRAIN.accelRate * delta);
     speed.current += dv;
     dist.current += speed.current * delta;

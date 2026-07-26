@@ -17,6 +17,7 @@ import { chron } from '../game/chronicle';
 import { conductorState, hash01 } from '../game/conductor';
 import { tryPortal } from '../game/portals';
 import { ROAD_DECK, ROAD_DECK_TOP } from '../config/trackSpline';
+import { worldT } from '../game/worldClock';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -256,7 +257,7 @@ export const BotHorde = () => {
       }
 
       // V5 C7: БОСС — every second CAPITULATION summons the Bear-Archon
-      const cs = conductorState(state.clock.elapsedTime);
+      const cs = conductorState(worldT()); // V8.6: боссы приходят одновременно у всех
       if (cs.epoch === 4 && Math.floor(cs.epochIdx / 6) % 2 === 0 && archonEpoch.current !== cs.epochIdx && bots.current.length < BOT_CAP) {
         archonEpoch.current = cs.epochIdx;
         const boss = makeBot(MUT_BY_ID['ARCHON'], 0 + (Math.random() - 0.5) * 20, 90, 0 + (Math.random() - 0.5) * 20);
@@ -313,7 +314,7 @@ export const BotHorde = () => {
         }
         // V7.5 Ц2: ambient life overrides the hunt — duels, wandering, hunters
         if (b.ambient && !b.aggro) {
-          const now2 = state.clock.elapsedTime;
+          const now2 = worldT();
           const mate = b.duelWith !== undefined && b.duelWith >= 0
             ? bots.current.find((o) => o.id === b.duelWith) : undefined;
           if (mate) {
@@ -381,7 +382,7 @@ export const BotHorde = () => {
         const dist = Math.hypot(dx, dz) || 1;
         dx /= dist; dz /= dist;
         let sx = dx, sz = dz;
-        const now = state.clock.elapsedTime;
+        const now = worldT();
         if (mut.behavior === 'flee' && dist < 45) { sx = -dx; sz = -dz; }
         if (mut.behavior === 'strafe') {
           sx = dx * 0.6 + -dz * b.strafeDir * 0.8;
@@ -399,7 +400,8 @@ export const BotHorde = () => {
         b.heading = Math.atan2(sx, sz);
         b.phase += dt * (4 + spd * 0.55);
 
-        // hop behavior
+        // hop behavior (lazy-init the deadline — worldT is huge, 0 means «not set»)
+        if (b.nextHopAt === 0) b.nextHopAt = now + Math.random() * 1.4;
         if (mut.behavior === 'hop' && now > b.nextHopAt && Math.abs(b.y - groundY.current[slot]) < 0.2) {
           b.vy = 9;
           b.nextHopAt = now + 1 + Math.random() * 1.4;
@@ -496,7 +498,7 @@ export const BotHorde = () => {
           if (arms.instanceColor) arms.instanceColor.needsUpdate = true;
           if (legs.instanceColor) legs.instanceColor.needsUpdate = true;
         }
-        writeBot(i, sm.x, sm.y, sm.z, sm.h, nb.s, nb.lm, state.clock.elapsedTime * 6, 6,
+        writeBot(i, sm.x, sm.y, sm.z, sm.h, nb.s, nb.lm, worldT() * 6, 6,
           head, torso, arms, legs, proxyRefs.current[i] ?? null);
         const proxy = proxyRefs.current[i];
         if (proxy) proxy.userData.id = String(nb.id);

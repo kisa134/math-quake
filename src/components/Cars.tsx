@@ -12,6 +12,7 @@ import { PALETTE } from '../theme';
 import { MATTE_WORLD_SOFT } from '../game/materials';
 import { updateEngine, stopEngine } from '../utils/audio';
 import { registerCarRecall } from '../game/admin';
+import { worldT } from '../game/worldClock';
 import { useEffect } from 'react';
 
 /**
@@ -203,9 +204,9 @@ export const Cars = () => {
     return () => registerCarRecall(null);
   }, []);
 
-  useFrame((fs, rawDelta) => {
+  useFrame((_, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1);
-    const fsT = fs.clock.elapsedTime;
+    const fsT = worldT(); // V8.6: the parade is identical on both clients
     const driving = useStore.getState().driving;
 
     // engine shutdown when we hop out by any path

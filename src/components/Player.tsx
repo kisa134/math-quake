@@ -10,6 +10,7 @@ import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { noteKill } from '../game/tradingDay';
 import { modMults, SOCKETS } from '../config/weaponMods';
 import { adminCtx, registerTeleport } from '../game/admin';
+import { worldT } from '../game/worldClock';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -278,7 +279,7 @@ export const Player = () => {
   useFrame((fs, delta) => {
     // V7 W1: the $SOUL index ticks on the liturgy clock — even while menus are
     // open, so the rose/strip stay live and liquidations never wait for you.
-    tickMarket(fs.clock.elapsedTime);
+    tickMarket(worldT()); // V8.6: the $SOUL chart is global wall-clock now
     {
       const pos = useStore.getState().position;
       if (pos && isLiquidated(pos, marketNow.price)) {
@@ -471,7 +472,7 @@ export const Player = () => {
       adminCtx.x = camera.position.x;
       adminCtx.y = camera.position.y;
       adminCtx.z = camera.position.z;
-      adminCtx.t = fs.clock.elapsedTime;
+      adminCtx.t = worldT();
       // V8 Ф2.5: look-lag feed — per-frame camera rotation delta (wrapped)
       {
         const yaw = camera.rotation.y, pitch = camera.rotation.x;

@@ -10,6 +10,7 @@ import { chron } from '../game/chronicle';
 import { addTrauma } from '../game/shake';
 import { playExplosionSound } from '../utils/audio';
 import { conductorState } from '../game/conductor';
+import { worldT } from '../game/worldClock';
 
 /**
  * V5 C3 — TOTEMS OF VICE: the Synty money-icons return to the WORLD. Ten
@@ -46,7 +47,7 @@ export const Totems = () => {
 
   useFrame((state) => {
     const now = Date.now();
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     while (totemHitInbox.length) {
       const h = totemHitInbox.pop()!;
       if (deadUntil.current[h.id] > now) continue;

@@ -32,6 +32,7 @@ import { conductorState } from '../game/conductor';
 import { updateAccent } from '../game/accent';
 import { chron, EPOCH_CHRONICLE } from '../game/chronicle';
 import { setAmbientMood, updateAudioReactive } from '../utils/audio';
+import { worldT } from '../game/worldClock';
 import { BotHorde } from './BotHorde';
 import { spawnBotWave, aliveBotCount } from './BotHorde';
 import { Dragons } from './Dragons';
@@ -58,7 +59,7 @@ import { Portals } from './Portals';
 let _lastEpoch = -1;
 const AccentDriver = () => {
   useFrame((state, dt) => {
-    const cs = conductorState(state.clock.elapsedTime);
+    const cs = conductorState(worldT()); // V8.6 shared wall clock
     updateAudioReactive(); // V7.6: sample the track's spectrum once per frame
     updateAccent(cs.epoch, dt, performance.now());
     if (cs.epoch !== _lastEpoch) {

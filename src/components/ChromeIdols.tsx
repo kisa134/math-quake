@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { AssetModel } from '../game/modelCache';
 import { tag } from '../game/hitTags';
 import { conductorState } from '../game/conductor';
+import { worldT } from '../game/worldClock';
 
 /**
  * V5 Wave C — THE CHROME IDOLS: the owner's three forge3d drops, meshopt'd
@@ -28,8 +29,8 @@ export const ChromeIdols = () => {
   const burstUntil = useRef(0);
   const extra = useRef(0);
 
-  useFrame((state, dt) => {
-    const t = state.clock.elapsedTime;
+  useFrame((_, dt) => {
+    const t = worldT(); // V8.6 shared wall clock
     // V7.5 Ц3: epoch turn → the carousel bursts into a 2s faster spin
     const cs = conductorState(t);
     if (cs.epoch !== lastEpoch.current) { lastEpoch.current = cs.epoch; burstUntil.current = t + 2; }

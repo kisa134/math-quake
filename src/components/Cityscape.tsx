@@ -7,6 +7,7 @@ import { tag } from '../game/hitTags';
 import { accent } from '../game/accent';
 import { MATTE_INSTANCED, MATTE_WORLD } from '../game/materials';
 import { getCity, type ClimbPiece, type Inst } from '../game/cityscape';
+import { worldT } from '../game/worldClock';
 
 /**
  * WS-A — renders the seeded 1-km cyberpunk city from generateCity().
@@ -144,7 +145,7 @@ export const Cityscape = () => {
 
   // ONE batched useFrame: planet rotation (+ one-time raycast patch below).
   useFrame((state, dt) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6: world layers tick on the shared wall clock
     frame.current = (frame.current + 1) % 8;
 
     // V5 monochrome: the city's glow IS the market's mood

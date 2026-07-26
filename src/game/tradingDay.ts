@@ -13,6 +13,11 @@ export const LAST_HOUR_AT = DAY_LEN - 75; // final cycle = CLOSING BELL crescend
 export const dayIndex = (t: number): number => Math.floor(t / DAY_LEN);
 export const dayT = (t: number): number => t - Math.floor(t / DAY_LEN) * DAY_LEN;
 
+// V8.6: worldT makes dayIndex ≈ 83 000 — anchor the DISPLAYED number to the
+// sync launch date so players see «ДЕНЬ 1», not «ДЕНЬ 83334».
+export const DAY0 = 82224; // trading days from WORLD_EPOCH0 to 2026-07-26T00:00Z
+export const displayDay = (d: number): number => d - DAY0 + 1;
+
 export interface DayStats {
   day: number;
   pnl: number;

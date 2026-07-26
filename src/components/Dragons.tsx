@@ -11,6 +11,7 @@ import {
   DRAGONS, DJOINT, getDragonParts, wildDragonPos, dragonState, dragonAlive,
   dragonFxInbox, RAINBOW,
 } from '../game/voxDragon';
+import { worldT } from '../game/worldClock';
 
 /**
  * V4.1 — renders the four voxel dragons. Wild ones fly deterministic analytic
@@ -37,7 +38,7 @@ export function tryMountDragon(px: number, py: number, pz: number): boolean {
     socket.emit('ddismount', { id });
     return true;
   }
-  const t = performance.now() / 1000;
+  const t = worldT(); // V8.6: FIX — mount used a different clock than render (~60u miss)
   for (const d of DRAGONS) {
     if (!dragonAlive(d.id) || dragonState[d.id].riddenBy) continue;
     wildDragonPos(d, t, _wild);
@@ -79,7 +80,7 @@ const DragonMesh = ({ def }: { def: (typeof DRAGONS)[number] }) => {
     if (proxy.current) proxy.current.position.set(0, -900 - def.id * 10, 0);
     if (!alive) return;
 
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     let flap = 0.18;
     if (st.ridingDragon === def.id) {
       // I ride it — follow the flight sim

@@ -13,6 +13,7 @@ import {
 import { orbSpawnInbox, ringInbox } from '../game/botHorde';
 import type { CandleEvent } from '../game/conductor';
 import { formationState } from '../game/formations';
+import { worldT } from '../game/worldClock';
 
 /**
  * V4.3 «Литургия ликвидаций» — the living candle cosmos renderer.
@@ -205,7 +206,7 @@ export const VoxelCandles = () => {
       const e = voxInbox.pop()!;
       _carve?.(e.id, e.x, e.y, e.z, e.r, false);
     }
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6: THE master clock of the liturgy — same for all
     const tW = warpTime(t);
     const cs = conductorState(t);
     // V7.5 Ц3: euphoria formations — during the figure, update at 1/2 instead

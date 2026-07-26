@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { BLACK_HOLE, conductorState } from '../game/voxCandles';
 import { accent } from '../game/accent';
+import { worldT } from '../game/worldClock';
 
 /**
  * V4.3 — THREE MOVING-AVERAGE NERVES threaded through the candle belts
@@ -40,7 +41,7 @@ export const MovingAverages = () => {
   const cursor = useRef(0);
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6: shares the -0.35t belt phase with the candles
     const cs = conductorState(t);
     const heart = 0.5 + 0.5 * Math.sin(cs.heartPhase);
     for (let li = 0; li < LINES.length; li++) {

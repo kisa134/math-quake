@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { portalState } from '../game/portals';
+import { worldT } from '../game/worldClock';
 
 /**
  * V6 Ш4 — renders the two portals: oval rings (blue A / orange B) oriented to
@@ -36,7 +37,7 @@ const PortalMesh = ({ slot }: { slot: 'a' | 'b' }) => {
     _q.setFromUnitVectors(_up, _n);
     g.position.set(p.x + p.nx * 0.15, p.y + p.ny * 0.15, p.z + p.nz * 0.15);
     g.quaternion.copy(_q);
-    const s = 1 + Math.sin(state.clock.elapsedTime * 3 + (slot === 'a' ? 0 : Math.PI)) * 0.05;
+    const s = 1 + Math.sin(worldT() * 3 + (slot === 'a' ? 0 : Math.PI)) * 0.05;
     g.scale.set(s, s * 1.55, s); // oval
   });
   return (

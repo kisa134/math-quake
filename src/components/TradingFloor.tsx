@@ -10,6 +10,7 @@ import { accent } from '../game/accent';
 import { conductorState } from '../game/conductor';
 import { BLACK_HOLE } from '../game/voxCandles';
 import { PALETTE } from '../theme';
+import { worldT } from '../game/worldClock';
 
 /**
  * V6 Ш2 — THE TRADING FLOOR: the new spawn scene (старая арена с 4 углами —
@@ -78,7 +79,7 @@ const GiantDude = ({ color, mirror }: { color: string; mirror: boolean }) => {
   const body = useRef<THREE.Group>(null);
 
   useFrame((state) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     const cs = conductorState(t);
     // the eternal fight: lean + swing harder on epoch extremes (микросценка v1)
     const aggr = 0.4 + 0.6 * Math.abs(cs.S);
@@ -145,7 +146,7 @@ export const TradingFloor = () => {
   const patched = useRef(false);
 
   useFrame((state, dt) => {
-    const t = state.clock.elapsedTime;
+    const t = worldT(); // V8.6 shared wall clock
     (floorMat.uniforms.uTime as { value: number }).value = t;
     ((floorMat.uniforms.uAccent as { value: THREE.Color }).value).copy(accent);
     (obeliskMat.uniforms.uTime as { value: number }).value = t;
