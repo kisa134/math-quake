@@ -165,6 +165,10 @@ interface GameState {
   damageEnemy: (id: string, amount: number, pos?: [number, number, number]) => void;
   removeEnemy: (id: string) => void;
   takeDamage: (amount: number) => void;
+  // V9 Б: контузия (отстрелили ноги — ползёшь) и добивание (камера доминации)
+  crippledUntil: number;
+  downedUntil: number;
+  reviveMe: () => void;
   addProjectile: (p: Omit<Projectile, 'id' | 'createdAt'>) => void;
   removeProjectile: (id: string) => void;
   addDamageNumber: (pos: [number, number, number], amount: number, color?: string) => void;
@@ -210,6 +214,8 @@ export const useStore = create<GameState>((set) => ({
   lastDeathFx: null,
   jetpackFuel: 100,
   jetpackStunUntil: 0,
+  crippledUntil: 0,
+  downedUntil: 0,
   god: true,              // immortal by default (admin sandbox)
   editorMode: false,
   editorSelect: isTower() ? 'gcandle' : 'pad',
@@ -344,11 +350,15 @@ export const useStore = create<GameState>((set) => ({
     const jetpackStunUntil = Date.now() + 1200; // a hit knocks the jetpack out briefly
     if (state.god) return { jetpackStunUntil }; // immortal: feel the hit, never lose HP
     const newHealth = Math.max(0, state.health - amount);
+    // тяжёлое попадание = КОНТУЗИЯ: ноги отстрелены, ползёшь и мир плывёт
+    const crippledUntil = amount >= 26 ? Date.now() + 4200 : state.crippledUntil;
     if (newHealth === 0) {
-      return { health: 0, isPlaying: false, jetpackStunUntil };
+      // ДОБИВАНИЕ: 3.5с своей камерой снизу смотришь на того, кто тебя добил
+      return { health: 0, downedUntil: Date.now() + 3500, crippledUntil, jetpackStunUntil };
     }
-    return { health: newHealth, jetpackStunUntil };
+    return { health: newHealth, crippledUntil, jetpackStunUntil };
   }),
+  reviveMe: () => set({ health: 100, downedUntil: 0, crippledUntil: 0 }),
 
   addProjectile: (p) => set((state) => ({
     projectiles: [...state.projectiles, { ...p, id: Math.random().toString(36).substring(2, 9), createdAt: Date.now() }]

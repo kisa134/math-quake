@@ -121,6 +121,8 @@ export const Player = () => {
   const heatRef = useRef(0);
   const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
   const prevShoot = useRef(false);  // ЛОАДАУТ: фронт ЛКМ
+  const downedRef = useRef(false);  // V9 Б: добит — сцена доминации
+  const crippledRef = useRef(false);// V9 Б: контужен — ползёшь
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
 
@@ -438,7 +440,21 @@ export const Player = () => {
         thirdPersonRef.current.rotation.set(0, eul.y, 0);
       }
     } else {
-      camera.position.set(currentPos.x, currentPos.y + 0.8, currentPos.z); // Eye level
+      // V9 Б: ползком глаза ниже, при добивании — щекой в пол
+      const eyeY = downedRef.current ? 0.18 : crippledRef.current ? 0.42 : 0.8;
+      camera.position.set(currentPos.x, currentPos.y + eyeY, currentPos.z); // Eye level
+      if (downedRef.current) {
+        // смотрим на ближайшего живого — он и есть твой палач
+        let bx = currentPos.x, by = currentPos.y + 2, bz = currentPos.z + 6, bd = Infinity;
+        for (const rp of Object.values(useStore.getState().remotePlayers)) {
+          const d = (rp.x - currentPos.x) ** 2 + (rp.z - currentPos.z) ** 2;
+          if (d < bd) { bd = d; bx = rp.x; by = rp.y + 1.2; bz = rp.z; }
+        }
+        camera.lookAt(bx, by, bz);
+        camera.rotation.z = 1.15 + Math.sin(performance.now() * 0.002) * 0.06; // щека в полу
+      } else if (crippledRef.current) {
+        camera.rotation.z += Math.sin(performance.now() * 0.006) * 0.02; // контузия плывёт
+      }
     }
 
     // Screen-shake as a positional offset, applied AFTER camera placement so it
@@ -654,6 +670,23 @@ export const Player = () => {
     }
     clampHorizontal(_moveVel);
 
+    // ── V9 Б: КОНТУЗИЯ и ДОБИВАНИЕ ─────────────────────────────────────────
+    {
+      const stx = useStore.getState();
+      const nowMs = Date.now();
+      downedRef.current = stx.downedUntil > nowMs;
+      crippledRef.current = !downedRef.current && stx.crippledUntil > nowMs;
+      if (downedRef.current) {
+        _moveVel.x = 0; _moveVel.z = 0;   // ты лежишь. смотри, как тебя добили
+      } else if (crippledRef.current) {
+        _moveVel.x *= 0.32; _moveVel.z *= 0.32; // ползёшь
+      } else if (stx.health === 0 && stx.downedUntil !== 0) {
+        stx.reviveMe();                   // подъём после сцены доминации
+        const b = playerRef.current;
+        if (b) { b.setTranslation({ x: SPAWN[0], y: SPAWN[1], z: SPAWN[2] }, true); b.setLinvel({ x: 0, y: 0, z: 0 }, true); }
+      }
+    }
+
     // ── ЛОАДАУТ: что на какой кнопке; во время листания клик ПРИВЯЗЫВАЕТ ────
     const abL = leftAb(), abR = rightAb();
     const binding = isBinding();
@@ -833,7 +866,7 @@ export const Player = () => {
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
     // V4 CS gunfeel: minigun heat (spin-up rate + growing cone) + spray reset
-    const wantsFire = !editorMode && fireHeld && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen && !useStore.getState().workbenchOpen;
+    const wantsFire = !downedRef.current && !editorMode && fireHeld && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen && !useStore.getState().workbenchOpen;
     if (config.heat) {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;

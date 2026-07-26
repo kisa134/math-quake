@@ -21,6 +21,7 @@ import { MapSelect } from './MapSelect';
 import { currentMap, setMapInUrl, isTower } from '../config/maps';
 import { TowerHUD } from './TowerHUD';
 import { LoadoutHUD } from './LoadoutHUD';
+import { DownedOverlay } from './DownedOverlay';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -90,6 +91,7 @@ export const UI = () => {
           <BuffBadges />
           {isTower() && <TowerHUD />}
           <LoadoutHUD />
+          <DownedOverlay />
           <ChronicleFeed />
           <ComboBadge />
           <SpellWheel />
