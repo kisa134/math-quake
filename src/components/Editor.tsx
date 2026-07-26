@@ -25,7 +25,9 @@ const GRID = 2;                    // grid snap (units)
 const ROT_STEP = Math.PI / 2;      // 90° rotation steps
 const SCALE_MIN = 0.25;            // V8.5: sandbox range — tiny…
 const SCALE_MAX = 30;              // …to гигантизм (×3-правило)
-const GHOST_RANGE = 30;            // where the red ghost floats when nothing is hit
+const GHOST_RANGE = 260;           // строим СКОЛЬКО УГОДНО ДАЛЕКО (гост улетает)
+const PLACE_REPEAT_MS = 150;       // зажал ЛКМ — ставит очередями
+const DELETE_REPEAT_MS = 130;      // зажал ПКМ — сносит очередями
 
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 const snapRot = (r: number) => Math.round(r / ROT_STEP) * ROT_STEP;
@@ -50,6 +52,8 @@ export const Editor = () => {
   const ghostRef = useRef<THREE.Group>(null);
   const prevPlace = useRef(false);
   const prevDelete = useRef(false);
+  const lastPlace = useRef(0);
+  const lastDelete = useRef(0);
   const hitPt = useRef(new THREE.Vector3());   // raw surface hit (delete search)
   const snapPt = useRef(new THREE.Vector3());  // grid-snapped placement point
   const hasHit = useRef(false);
@@ -120,13 +124,25 @@ export const Editor = () => {
       ghostRef.current.position.copy(snapPt.current);
       ghostRef.current.rotation.y = rotY;
       ghostRef.current.scale.setScalar(spec.baseScale * scl);
-      GHOST_MAT.color.copy(hasHit.current ? COL_VALID : COL_INVALID);
-      GHOST_MAT.emissive.copy(hasHit.current ? COL_VALID : COL_INVALID);
-      GHOST_MAT.emissiveIntensity = hasHit.current ? 0.9 : 0.6;
+      // зелёный = реально встанет (в башне ещё и опора + деньги)
+      let ok = true;
+      if (isTower()) {
+        const cand: BuiltPiece = { id: '_g', assetId: sel, x: snapPt.current.x, y: snapPt.current.y, z: snapPt.current.z, scale: scl };
+        const existing: BuiltPiece[] = st.placedProps.map((q) => ({
+          id: q.id, assetId: q.assetId, x: q.x, y: q.y, z: q.z, scale: q.scale,
+        }));
+        ok = st.money >= buildCost(sel, scl) && isSupportedAt(cand, existing);
+      }
+      GHOST_MAT.color.copy(ok ? COL_VALID : COL_INVALID);
+      GHOST_MAT.emissive.copy(ok ? COL_VALID : COL_INVALID);
+      GHOST_MAT.emissiveIntensity = ok ? 0.9 : 0.6;
     }
 
-    // place (LMB edge) — only on a valid snapped surface hit
-    if (keys.shoot && !prevPlace.current && hasHit.current) {
+    // СТАВИМ: зажатая ЛКМ ставит очередями, и на ЛЮБОЙ дистанции —
+    // даже в пустоту (свободная точка луча в 260 юнитах)
+    const nowMs = performance.now();
+    if (keys.shoot && (!prevPlace.current || nowMs - lastPlace.current > PLACE_REPEAT_MS)) {
+      lastPlace.current = nowMs;
       const prop = {
         id: Math.random().toString(36).slice(2, 9),
         assetId: sel,
@@ -136,29 +152,30 @@ export const Editor = () => {
         body: st.editorBody,
       };
       // МАТ-БАШНЯ: стройка стоит ДЕНЕГ и требует ОПОРЫ (Valheim-правило)
+      let canPlace = true;
       if (isTower()) {
         const cost = buildCost(sel, scl);
         const cand: BuiltPiece = { id: prop.id, assetId: sel, x: prop.x, y: prop.y, z: prop.z, scale: scl };
         const existing: BuiltPiece[] = st.placedProps.map((q) => ({
           id: q.id, assetId: q.assetId, x: q.x, y: q.y, z: q.z, scale: q.scale,
         }));
-        if (st.money < cost || !isSupportedAt(cand, existing)) {
-          prevPlace.current = keys.shoot;
-          return; // нет денег или висит в воздухе — не ставим
-        }
-        st.addMoney(-cost);
+        canPlace = st.money >= cost && isSupportedAt(cand, existing);
+        if (canPlace) st.addMoney(-cost);
       }
-      st.addProp(prop);
-      socket.emit('place', { prop });
+      if (canPlace) {
+        st.addProp(prop);
+        socket.emit('place', { prop });
+      }
     }
     prevPlace.current = keys.shoot;
 
-    // delete (RMB edge) — nearest placed prop to the aim point
-    if (keys.grapple && !prevDelete.current && hasHit.current) {
+    // СНОСИМ: зажатая ПКМ сносит очередями, целясь куда угодно
+    if (keys.grapple && (!prevDelete.current || nowMs - lastDelete.current > DELETE_REPEAT_MS)) {
+      lastDelete.current = nowMs;
       let best: string | null = null;
-      let bestD = 12 * 12;
+      let bestD = 16 * 16;
       for (const p of st.placedProps) {
-        const dx = p.x - hitPt.current.x, dy = p.y - hitPt.current.y, dz = p.z - hitPt.current.z;
+        const dx = p.x - snapPt.current.x, dy = p.y - snapPt.current.y, dz = p.z - snapPt.current.z;
         const d = dx * dx + dy * dy + dz * dz;
         if (d < bestD) { bestD = d; best = p.id; }
       }
