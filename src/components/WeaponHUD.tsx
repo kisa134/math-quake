@@ -2,7 +2,7 @@ import { useStore } from '../store';
 import { WEAPONS } from '../config/weapons';
 
 /**
- * Bottom weapon-select strip — V2: five BIG slots, one per weapon. Each slot
+ * Bottom weapon-select strip — V8: a 2-row grid of all 16 slots. Each slot
  * shows the key number, the weapon name, and a fat tracer-colored bar; the
  * active slot glows in ITS OWN weapon color (not generic emerald) and lifts.
  * Pure DOM overlay (no per-frame cost) — reads currentWeapon from the store

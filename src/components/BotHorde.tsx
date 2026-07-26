@@ -22,7 +22,7 @@ import { fetchEchoes, type Echo } from '../net/echoes';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
- * exactly SIX draw calls total (one InstancedMesh per body part for the WHOLE
+ * four InstancedMesh draws total (one InstancedMesh per body part for the WHOLE
  * horde, module-shared voxel geometries, per-instance mutation color). No
  * RigidBodies: analytic steering + manual gravity + round-robin ground rays
  * (6 bots/frame, far-clamped — the raycast law). Host simulates, peers mirror

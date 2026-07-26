@@ -1,7 +1,7 @@
 /**
  * Single source of truth for weapon tuning + feel. Cold-path config — pure
- * data, no framework imports. V2: the arsenal is 5 PERFECT weapons instead of
- * 20 crooked ones. Visibility is SYSTEMIC, not hand-tuned: WeaponModel measures
+ * data, no framework imports. V8: a 16-strong arsenal, every gun with its own
+ * character (sonic fantasy, shells, thermal states, constructor sockets). Visibility is SYSTEMIC, not hand-tuned: WeaponModel measures
  * each FBX with a bounding box and scales it so its longest dimension equals
  * `vLen` (meters in view space) — a weapon can never be invisible again,
  * regardless of the FBX's native units. `mScale` is now a pose MULTIPLIER on

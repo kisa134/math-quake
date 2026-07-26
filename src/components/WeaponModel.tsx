@@ -165,7 +165,7 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
         mesh.receiveShadow = false;
       }
     });
-    // ── Systemic bbox normalization (same pattern as CharacterModel) ─────────
+    // ── Systemic bbox normalization ──────────────────────────────────────────
     // Longest dimension → spec.vLen, geometry centered on the origin. The tune
     // pose is applied to the OUTER group, so pose numbers are always in sane,
     // human-scale view units no matter what the FBX was authored in.

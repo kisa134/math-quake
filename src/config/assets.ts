@@ -73,7 +73,7 @@ export const ASSETS: AssetSpec[] = [
 ];
 
 export const ASSET_BY_ID: Record<string, AssetSpec> = Object.fromEntries(ASSETS.map((a) => [a.id, a]));
-// Fallback stays the skull creature (CharacterModel avatars depend on it), not ASSETS[0].
+// Fallback stays the skull creature, not ASSETS[0].
 export const getAsset = (id: string): AssetSpec => ASSET_BY_ID[id] ?? ASSET_BY_ID['skull'];
 // V8.5 «максимум песочницы»: ВЕСЬ каталог строится — идолы, планеты, иконки.
 ASSETS.forEach((a) => { a.buildable = true; });
