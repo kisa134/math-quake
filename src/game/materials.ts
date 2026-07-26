@@ -23,7 +23,11 @@ export function makeSparkleMatte(opts?: {
   const sparkle = opts?.sparkle ?? 0.9;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uSparkle = { value: sparkle };
-    shader.fragmentShader = shader.fragmentShader.replace(
+    // V8 fix: the GLSL DECLARATION must be injected too — adding the uniform
+    // to shader.uniforms uploads the value but never declares it, so the
+    // fragment failed to compile («uSparkle: undeclared identifier») and the
+    // matte surfaces silently dropped their glitter.
+    shader.fragmentShader = ('uniform float uSparkle;\n' + shader.fragmentShader).replace(
       '#include <emissivemap_fragment>',
       /* glsl */ `
       #include <emissivemap_fragment>
@@ -37,6 +41,9 @@ export function makeSparkleMatte(opts?: {
       `,
     );
   };
+  // distinct program per sparkle value — the three shared instances otherwise
+  // collide on the default cache key (identical onBeforeCompile source)
+  mat.customProgramCacheKey = () => `sparkle-matte-${sparkle}`;
   return mat;
 }
 
