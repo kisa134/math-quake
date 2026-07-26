@@ -60,10 +60,14 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
     if (t && g) {
       const p = punch.current;
       const arc = Math.sin(Math.min(1, p) * Math.PI);
-      const bobY = Math.sin(clock.current * 1.6) * 0.006;
-      const bobX = Math.cos(clock.current * 1.1) * 0.004;
+      // V8 Ф1 idle+run life: breathing at rest, WALK-CYCLE SWAY at speed
+      const spd01 = Math.min(1, gunState.speed / 20);
+      const swayF = 1.6 + spd01 * 5.5;
+      const bobY = Math.sin(clock.current * swayF) * 0.006 * (1 + spd01 * 2.2);
+      const bobX = Math.cos(clock.current * swayF * 0.7) * 0.004 * (1 + spd01 * 2.6);
+      const swayRoll = Math.sin(clock.current * swayF * 0.5) * 0.02 * spd01;
       g.position.set(t.pos[0] + bobX, t.pos[1] + bobY + p * 0.03, t.pos[2] + p * 0.14);
-      g.rotation.set(t.rot[0] - p * 0.3, t.rot[1], t.rot[2] + p * 0.05);
+      g.rotation.set(t.rot[0] - p * 0.3, t.rot[1], t.rot[2] + p * 0.05 + swayRoll);
       g.scale.setScalar(spec.vLen * t.scale);
 
       // moving part: bolt kicks back / pump racks / minigun barrels spin
@@ -84,7 +88,8 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
         light.intensity = 2.2 * (1 + 0.08 * Math.sin(clock.current * 3)) + p * 2.4;
       }
     }
-    punch.current = Math.max(0, punch.current - delta * 11);
+    // V8 Ф1 heft: heavy guns' bolt returns slower — mass you can feel
+    punch.current = Math.max(0, punch.current - delta * (spec.recoil > 0.5 ? 7.5 : 11));
   });
 
   return (
@@ -155,9 +160,11 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       // 0→1→0 arc over the punch decay — turns the linear decay into a sweep
       // that goes OUT and comes BACK (the soul of a slash/pump/swing).
       const arc = Math.sin(Math.min(1, p) * Math.PI);
-      // Idle breathing bob so the viewmodel feels alive at rest.
-      const bobY = Math.sin(clock.current * 1.6) * 0.006;
-      const bobX = Math.cos(clock.current * 1.1) * 0.004;
+      // V8 Ф1: breathing at rest, walk-cycle sway at speed.
+      const spd01 = Math.min(1, gunState.speed / 20);
+      const swayF = 1.6 + spd01 * 5.5;
+      const bobY = Math.sin(clock.current * swayF) * 0.006 * (1 + spd01 * 2.2);
+      const bobX = Math.cos(clock.current * swayF * 0.7) * 0.004 * (1 + spd01 * 2.6);
 
       // ── Procedural fire animation per weapon class (zero-alloc) ────────────
       let px = 0, py = 0, pz = 0, rx = 0, ry = 0, rz = 0;
@@ -198,7 +205,8 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       }
     }
     // V5 C1 CS recovery: snappier spring-back — the barrel «доводится» home.
-    punch.current = Math.max(0, punch.current - delta * 11);
+    // V8 Ф1 heft: heavy weapons come home slower.
+    punch.current = Math.max(0, punch.current - delta * (spec.recoil > 0.5 ? 7.5 : 11));
   });
 
   return (

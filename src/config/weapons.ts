@@ -12,6 +12,19 @@
  */
 export type WeaponAnim = 'slash' | 'pump' | 'thrust' | 'swing';
 
+// V8 Ф1 — the living weapon layers (docs/V8_VISION.md §6-7):
+export interface WeaponSonic {
+  body: 'crack' | 'blast' | 'zap' | 'bloom'; // the shot's carrier character
+  punch: number; // 0..1 sub-bass depth (удар в грудь)
+  tail: number;  // 0..1 decay length (хвост/воздух)
+}
+export interface WeaponShell {
+  none?: boolean;  // no brass: steam/sparks instead (wands, rail, harpoon)
+  size?: number;   // casing base size
+  color?: string;  // casing color
+  count?: number;  // casings per trigger pull
+}
+
 export interface WeaponSpec {
   name: string;
   rate: number; // ms between shots
@@ -41,6 +54,8 @@ export interface WeaponSpec {
   portal?: boolean; // V6 Ш4: LMB places portals A/B instead of shooting
   heat?: boolean; // minigun: spread+rate scale with a spin-up heat 0..1
   slow?: number;  // movement speed multiplier while firing (minigun stomp)
+  sonic?: WeaponSonic; // V8 Ф1: 5-layer sound fantasy (filled by the tables below)
+  shell?: WeaponShell; // V8 Ф1: per-weapon casing style
 }
 
 export const WEAPONS: WeaponSpec[] = [
@@ -159,5 +174,47 @@ export const WEAPONS: WeaponSpec[] = [
     model: 'weapons/SM_Wep_Sword_Large_01.fbx', vLen: 1.0, mScale: 1, voxel: 'swan',
     mPos: [0.29, -0.35, -0.54], mRot: [0.08, 0, 0.1] },
 ];
+
+// ── V8 Ф1: sonic fantasy + shell style, index-aligned (baked into the specs) ──
+// Sonic: GLITCH WAND crystalline snap · SCATTER мясной blast · STAFF wet bloom ·
+// RAIL slicing crack+after-ring · KALASH industrial chatter · SHREDDER chunk ·
+// HARPOON launch+thunk · SWAN catastrophic hit+ominous tail.
+const SONICS: WeaponSonic[] = [
+  { body: 'zap',   punch: 0.25, tail: 0.25 }, // 1 GLITCH WAND
+  { body: 'blast', punch: 0.8,  tail: 0.35 }, // 2 SCATTER SHOT
+  { body: 'bloom', punch: 0.5,  tail: 0.5 },  // 3 PLASMA STAFF
+  { body: 'crack', punch: 0.7,  tail: 0.9 },  // 4 RAIL BLADE
+  { body: 'zap',   punch: 0.15, tail: 0.1 },  // 5 DELTA DAGGER
+  { body: 'crack', punch: 0.65, tail: 0.3 },  // 6 KALASH GLITCH
+  { body: 'blast', punch: 0.5,  tail: 0.15 }, // 7 SALARY SHREDDER
+  { body: 'crack', punch: 0.9,  tail: 0.5 },  // 8 MARGIN CALL
+  { body: 'bloom', punch: 0.3,  tail: 0.4 },  // 9 PORTAL RIG
+  { body: 'blast', punch: 1.0,  tail: 0.45 }, // 10 BEAR TRAP
+  { body: 'zap',   punch: 0.2,  tail: 0.12 }, // 11 HFT STITCHER
+  { body: 'bloom', punch: 0.45, tail: 0.25 }, // 12 FED PRINTER
+  { body: 'blast', punch: 0.9,  tail: 0.7 },  // 13 WHALE HARPOON
+  { body: 'crack', punch: 0.55, tail: 0.2 },  // 14 INSIDER TIP (псст)
+  { body: 'blast', punch: 0.7,  tail: 0.3 },  // 15 LIQUIDATOR
+  { body: 'crack', punch: 1.0,  tail: 1.0 },  // 16 BLACK SWAN
+];
+const SHELLS: WeaponShell[] = [
+  { none: true },                                    // wand — sparks
+  { size: 0.09, color: '#c0392b', count: 1 },        // shotgun — fat red shell
+  { none: true },                                    // staff
+  { none: true },                                    // rail — steam
+  { none: true },                                    // dagger
+  { size: 0.05, color: '#e9c46a', count: 1 },        // kalash
+  { size: 0.045, color: '#e9c46a', count: 2 },       // minigun — brass rain
+  { size: 0.075, color: '#ffd97a', count: 1 },       // deagle — big golden
+  { none: true },                                    // portal
+  { size: 0.1, color: '#c0392b', count: 2 },         // bear trap — two fat shells
+  { size: 0.03, color: '#e9c46a', count: 2 },        // hft — tiny rain
+  { size: 0.06, color: '#b7f7d4', count: 1 },        // printer — BILLS fly out
+  { none: true },                                    // harpoon — cable steam
+  { size: 0.05, color: '#ffffff', count: 1 },        // insider — white casing
+  { size: 0.08, color: '#c0392b', count: 1 },        // liquidator
+  { size: 0.07, color: '#ffffff', count: 3 },        // swan — white FEATHERS
+];
+WEAPONS.forEach((w, i) => { w.sonic = SONICS[i]; w.shell = SHELLS[i]; });
 
 export const weaponName = (i: number): string => WEAPONS[i]?.name ?? 'UNKNOWN';

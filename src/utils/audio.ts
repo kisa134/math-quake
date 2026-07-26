@@ -297,6 +297,105 @@ export const playHitTick = () => {
   osc.stop(t + 0.06);
 };
 
+// ── V8 Ф1: THE FIVE-LAYER SHOT (docs/V8_VISION.md §7) ───────────────────────
+// Mech (bolt click) + Body (carrier by character) + Punch (sub, удар в грудь)
+// + Tail (decaying air) + Foley (delayed shell tink). Player's gun is the
+// payoff — it gets the full stack; enemies keep the old thin blips.
+const noiseBurst = (t: number, dur: number, gain: number, filterType: BiquadFilterType, freq: number, q = 0.8) => {
+  if (!audioCtx) return;
+  const len = Math.max(1, Math.floor(audioCtx.sampleRate * dur));
+  const buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  const f = audioCtx.createBiquadFilter();
+  f.type = filterType; f.frequency.value = freq; f.Q.value = q;
+  const g = audioCtx.createGain();
+  g.gain.setValueAtTime(gain, t);
+  src.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  src.start(t); src.stop(t + dur);
+};
+
+export const playWeaponSound = (freq: number, sonic?: { body: 'crack' | 'blast' | 'zap' | 'bloom'; punch: number; tail: number }) => {
+  if (!audioCtx) return;
+  const s = sonic ?? { body: 'zap' as const, punch: 0.5, tail: 0.3 };
+  const t = audioCtx.currentTime;
+  const out = audioCtx.destination;
+
+  // 1 MECH — 12ms metallic bolt click (the working machine)
+  {
+    const o = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'square';
+    o.frequency.value = 2400 + Math.random() * 500;
+    g.gain.setValueAtTime(0.045, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
+    o.connect(g); g.connect(out);
+    o.start(t); o.stop(t + 0.012);
+  }
+
+  // 2 BODY — the carrier, per character
+  if (s.body === 'crack') {
+    noiseBurst(t, 0.06, 0.22, 'bandpass', 1900, 1.1);
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(40, freq / 5), t + 0.07);
+    g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.07);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.07);
+  } else if (s.body === 'blast') {
+    noiseBurst(t, 0.12, 0.3, 'lowpass', 900, 0.7);
+    noiseBurst(t, 0.05, 0.12, 'bandpass', 2600, 1.5); // top-end slap
+  } else if (s.body === 'zap') {
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(freq, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(60, freq / 4), t + 0.08);
+    g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.08);
+    noiseBurst(t, 0.02, 0.06, 'highpass', 3200, 0.7); // crystalline fizz
+  } else { // bloom — wet electric swell
+    const o = audioCtx.createOscillator(); const o2 = audioCtx.createOscillator();
+    const g = audioCtx.createGain();
+    o.type = 'triangle'; o2.type = 'sine';
+    o.frequency.setValueAtTime(freq * 0.9, t);
+    o.frequency.exponentialRampToValueAtTime(freq * 1.4, t + 0.09);
+    o2.frequency.value = freq * 1.502; // detuned partner
+    g.gain.setValueAtTime(0.001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
+    o.connect(g); o2.connect(g); g.connect(out);
+    o.start(t); o.stop(t + 0.12); o2.start(t); o2.stop(t + 0.12);
+  }
+
+  // 3 PUNCH — the chest hit (depth per weapon)
+  if (s.punch > 0.05) {
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(110, t);
+    o.frequency.exponentialRampToValueAtTime(36, t + 0.1);
+    g.gain.setValueAtTime(0.22 * s.punch, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.12);
+  }
+
+  // 4 TAIL — decaying air (length per weapon)
+  if (s.tail > 0.05) {
+    noiseBurst(t + 0.02, 0.12 + 0.5 * s.tail, 0.05 * s.tail + 0.02, 'lowpass', 750, 0.6);
+  }
+
+  // 5 FOLEY — the shell tink, 130ms later
+  if (s.tail > 0.02 || s.punch > 0.4) {
+    const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(3100, t + 0.13);
+    o.frequency.exponentialRampToValueAtTime(2200, t + 0.16);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.setValueAtTime(0.03, t + 0.13);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.17);
+    o.connect(g); g.connect(out); o.start(t + 0.13); o.stop(t + 0.17);
+  }
+};
+
 // Layered AAA-ish shot: the classic square zap + a sub-bass thump underneath
 // (the thump is what makes a gun feel heavy) + a 10ms noise click transient.
 export const playShootSound = (freq = 400, dur = 0.1) => {

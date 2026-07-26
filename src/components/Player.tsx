@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { RigidBody, CapsuleCollider, useRapier } from '@react-three/rapier';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { useStore } from '../store';
-import { playShootSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
+import { playShootSound, playWeaponSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
 import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { noteKill } from '../game/tradingDay';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
@@ -764,8 +764,8 @@ export const Player = () => {
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
       setLastShootTime(now);
-      // ±8% pitch wobble — organic тратата, never robotic
-      playShootSound(config.sound * (0.92 + Math.random() * 0.16), 0.05);
+      // V8 Ф1: the five-layer shot (mech/body/punch/tail/foley), ±8% pitch wobble
+      playWeaponSound(config.sound * (0.92 + Math.random() * 0.16), config.sonic);
       fireShot(config.recoil); // crosshair bloom + viewmodel punch
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
@@ -783,21 +783,42 @@ export const Player = () => {
 
       // (viewmodel recoil punch is handled in WeaponModel via the fire event)
 
-      // brass: 2 golden shell casings kick out to the right (hitscan guns only)
-      if (!config.type && spell.kind === 'none') {
+      // V8 Ф1: per-weapon shell theatre — brass style from the spec; «none»
+      // weapons vent steam/sparks instead (wands, rail, harpoon).
+      if (spell.kind === 'none') {
         camera.getWorldDirection(_recoilVec);
         const rx = -_recoilVec.z, rz = _recoilVec.x; // right = dir × up (y terms drop)
-        useStore.getState().addDebris([0, 1].map(() => ({
-          x: camera.position.x + _recoilVec.x * 0.9 + rx * 0.3,
-          y: camera.position.y - 0.25,
-          z: camera.position.z + _recoilVec.z * 0.9 + rz * 0.3,
-          vx: rx * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
-          vy: 1.6 + Math.random() * 1.2,
-          vz: rz * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
-          color: '#e9c46a', size: 0.055 + Math.random() * 0.035,
-          rx: Math.random() * 8, ry: Math.random() * 8, rz: Math.random() * 8,
-          life: 650 + Math.random() * 250,
-        })));
+        const sh = config.shell;
+        if (sh?.none) {
+          if (Math.random() < 0.4) {
+            useStore.getState().addDebris([{
+              x: camera.position.x + _recoilVec.x * 1.1,
+              y: camera.position.y - 0.15,
+              z: camera.position.z + _recoilVec.z * 1.1,
+              vx: (Math.random() - 0.5) * 0.8,
+              vy: 1.4 + Math.random() * 0.8,
+              vz: (Math.random() - 0.5) * 0.8,
+              color: '#cfd6d9', size: 0.05 + Math.random() * 0.04,
+              rx: Math.random() * 4, ry: Math.random() * 4, rz: Math.random() * 4,
+              life: 420 + Math.random() * 200,
+            }]);
+          }
+        } else if (!config.type || sh) {
+          const size = sh?.size ?? 0.055;
+          const color = sh?.color ?? '#e9c46a';
+          const count = sh?.count ?? 2;
+          useStore.getState().addDebris(Array.from({ length: count }, () => ({
+            x: camera.position.x + _recoilVec.x * 0.9 + rx * 0.3,
+            y: camera.position.y - 0.25,
+            z: camera.position.z + _recoilVec.z * 0.9 + rz * 0.3,
+            vx: rx * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
+            vy: 1.6 + Math.random() * 1.2,
+            vz: rz * (2.2 + Math.random() * 1.5) + (Math.random() - 0.5),
+            color, size: size + Math.random() * size * 0.5,
+            rx: Math.random() * 8, ry: Math.random() * 8, rz: Math.random() * 8,
+            life: 650 + Math.random() * 250,
+          })));
+        }
       }
 
       const center = new THREE.Vector2(0, 0);
