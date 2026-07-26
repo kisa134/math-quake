@@ -26,9 +26,9 @@ export const ECON = {
 
 export const MATCH = {
   buySeconds: 8,         // buy-phase length between rounds (V4.2: снят простой)
-  waveBase: 10,          // V8.6 perf diet
-  wavePerRound: 3,       // +bots each round
-  waveCap: 34,           // волна ≤24 + амбиент 8 + Архонт — дышится легче
+  waveBase: 12,          // bots in round 1 (V7.5: цирк — сразу толпа)
+  wavePerRound: 4,       // +bots each round
+  waveCap: 45,           // BOT_CAP 64: волна ≤31 + амбиент 16 + Архонт влезают
   spawnGapMs: 550,       // spacing between bot spawns within a wave
 };
 

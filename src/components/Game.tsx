@@ -71,16 +71,6 @@ const AccentDriver = () => {
   return null;
 };
 
-/** V8.6 PERF: LITE mode — pixel ratio 1 + heavy decorative layers unmounted. */
-const LiteDriver = () => {
-  const lite = useStore((s) => s.lite);
-  const gl = useThree((s) => s.gl);
-  useEffect(() => {
-    gl.setPixelRatio(lite ? 1 : Math.min(window.devicePixelRatio || 1, 1.5));
-  }, [lite, gl]);
-  return null;
-};
-
 /** V4.1 digital-maximalism CHROME: a procedural environment map (no network,
  *  no HDR download) so every metallic surface actually REFLECTS — instant
  *  hrom-glянец across towers, weapons, dragons. One-time PMREM bake. */
@@ -147,7 +137,6 @@ const GameManager = () => {
 };
 
 export const Game = () => {
-  const lite = useStore((s) => s.lite);
   return (
     <Canvas 
       shadows={false} 
@@ -155,9 +144,8 @@ export const Game = () => {
       gl={{ powerPreference: "high-performance", antialias: false, stencil: false, depth: true }}
       dpr={[1, 1.5]}
     >
-      <fog attach="fog" args={[PALETTE.voidDeep, 600, lite ? 4200 : 7000]} />
+      <fog attach="fog" args={[PALETTE.voidDeep, 600, 7000]} />
       <ChromeEnv />
-      <LiteDriver />
       <AccentDriver />
       <Physics gravity={[0, -30, 0]}>
         <GameManager />
@@ -187,9 +175,9 @@ export const Game = () => {
         <Ragdolls />
         <ShockRings />
         <Euphoria />
-        {!lite && <LowerSwarm />}
-        {!lite && <UpperSwarm />}
-        {!lite && <HighSwarm />}
+        <LowerSwarm />
+        <UpperSwarm />
+        <HighSwarm />
         <PhysProps />
         <Totems />
         <ChromeIdols />
@@ -203,7 +191,7 @@ export const Game = () => {
         <Projectiles />
         <DamageNumbers />
       </Physics>
-      {!lite && <PostFX />}
+      <PostFX />
     </Canvas>
   );
 };

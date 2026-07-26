@@ -89,7 +89,7 @@ function makePlate(name: string, bag: number): THREE.CanvasTexture {
 }
 
 // V7.5 Ц2 — АМБИЕНТ-СЛОЙ: мир живёт и без раундов. Три сцены жизни.
-const AMBIENT_TARGET = 8; // V8.6 perf diet (was 14)
+const AMBIENT_TARGET = 14;
 const RR = 9; // ground-ray round-robin step (64/9 ≈ 7 лучей/кадр — закон)
 function ambientSpot(): [number, number, number] {
   const roll = Math.random();

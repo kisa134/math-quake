@@ -156,9 +156,8 @@ export function generateCity(seed = CITY_SEED): CityData {
     clusters.push([Math.cos(a) * r, Math.sin(a) * r]);
   }
 
-  // V8.6 PERF: диета после включения блёсток — эти башни теперь РЕАЛЬНО
-  // рендерятся (шейдер чинился), 780 гигантов убивали слабый GPU филлрейтом.
-  const BUILDING_TARGET = 520;
+  // V7.5 Ц3: город приходит В среднее кольцо (350-800 было мёртвой зоной)
+  const BUILDING_TARGET = 780;
   let placed = 0;
   let guard = 0;
   while (placed < BUILDING_TARGET && guard++ < BUILDING_TARGET * 6) {
@@ -179,7 +178,7 @@ export function generateCity(seed = CITY_SEED): CityData {
     if (TEMPLES.some(([tx, tz]) => Math.max(Math.abs(x - tx), Math.abs(z - tz)) < 75)) continue;
 
     let h = 150 + rnd() * rnd() * 600;            // V6: 150–750 base skyline
-    if (rnd() < 0.08) h = 1000 + rnd() * 2200;    // V8.6 perf: supertalls реже и до 3200
+    if (rnd() < 0.14) h = 1200 + rnd() * 3800;    // V6: supertalls → up to 5000
     if (r < 700) h = 60 + rnd() * rnd() * 240;    // внутренний пояс низкий — сайтлайны плиты живы
     const w = 30 + rnd() * 60;
     const d = 30 + rnd() * 60;
