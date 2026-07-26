@@ -20,7 +20,6 @@ import { Hub } from './Hub';
 import { MapSelect } from './MapSelect';
 import { currentMap, setMapInUrl, isTower } from '../config/maps';
 import { TowerHUD } from './TowerHUD';
-import { LoadoutHUD } from './LoadoutHUD';
 import { DownedOverlay } from './DownedOverlay';
 import { BuyMenu } from './BuyMenu';
 
@@ -72,7 +71,7 @@ export const UI = () => {
               <h1 className="text-5xl font-black italic tracking-tighter leading-none">KLEIN_04</h1>
               <div className="flex gap-4 mt-2">
                 <span className="text-[10px] bg-amber-400 text-black px-2 py-0.5 font-bold uppercase">GOD MODE</span>
-                <span className="text-[10px] border border-white/30 px-2 py-0.5 font-bold uppercase">B — BUILD</span>
+                <span className="text-[10px] border border-white/30 px-2 py-0.5 font-bold uppercase">R — BUILD</span>
               </div>
             </div>
             <div className="text-right">
@@ -90,7 +89,6 @@ export const UI = () => {
           <KillFlash />
           <BuffBadges />
           {isTower() && <TowerHUD />}
-          <LoadoutHUD />
           <DownedOverlay />
           <ChronicleFeed />
           <ComboBadge />
@@ -129,7 +127,7 @@ export const UI = () => {
                 <div className="text-2xl font-black italic uppercase tracking-widest bg-white text-black py-1 px-4 mb-2">
                   {editorMode ? propName : weaponName}
                 </div>
-                <div className="text-xs text-amber-200 font-mono">{editorMode ? 'SCROLL piece · R rotate 90° · [ ] size ×1–2 · G static/phys · LMB place · RMB del' : '[1-8] WEAPON · [P] BUY · [B] BUILD'}</div>
+                <div className="text-xs text-amber-200 font-mono">{editorMode ? 'SCROLL деталь · Q поворот · [ ] размер · G статик/физика · ЛКМ ставить · ПКМ удалить · R выход' : 'КОЛЕСО/1-9 ствол · SHIFT прицел · ПКМ крюк · R стройка · P закуп'}</div>
               </div>
             </div>
 

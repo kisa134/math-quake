@@ -59,7 +59,7 @@ export const Editor = () => {
     const onKey = (e: KeyboardEvent) => {
       const st = useStore.getState();
       if (!st.editorMode) return;
-      if (e.code === 'KeyR') st.setEditorRotY(snapRot(st.editorRotY) + ROT_STEP);
+      if (e.code === 'KeyQ') st.setEditorRotY(snapRot(st.editorRotY) + ROT_STEP); // R выходит из стройки
       else if (e.code === 'BracketRight' || e.code === 'Equal') st.setEditorScale(Math.min(SCALE_MAX, st.editorScale * 1.25));
       else if (e.code === 'BracketLeft' || e.code === 'Minus') st.setEditorScale(Math.max(SCALE_MIN, st.editorScale / 1.25));
       else if (e.code === 'KeyG') st.setEditorBody(st.editorBody === 'fixed' ? 'dynamic' : 'fixed');

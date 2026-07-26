@@ -10,6 +10,7 @@ export const useKeyboard = () => {
     shoot: false,
     command: false,
     grapple: false,
+    aim: false,
   });
 
   useEffect(() => {
@@ -21,6 +22,7 @@ export const useKeyboard = () => {
         case 'KeyD': setKeys((k) => ({ ...k, right: true })); break;
         case 'Space': setKeys((k) => ({ ...k, jump: true })); break;
         case 'KeyF': setKeys((k) => ({ ...k, command: true })); break;
+        case 'ShiftLeft': case 'ShiftRight': setKeys((k) => ({ ...k, aim: true })); break;
       }
     };
     
@@ -32,6 +34,7 @@ export const useKeyboard = () => {
         case 'KeyD': setKeys((k) => ({ ...k, right: false })); break;
         case 'Space': setKeys((k) => ({ ...k, jump: false })); break;
         case 'KeyF': setKeys((k) => ({ ...k, command: false })); break;
+        case 'ShiftLeft': case 'ShiftRight': setKeys((k) => ({ ...k, aim: false })); break;
       }
     };
 

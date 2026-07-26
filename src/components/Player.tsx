@@ -11,8 +11,7 @@ import { noteKill } from '../game/tradingDay';
 import { modMults, SOCKETS } from '../config/weaponMods';
 import { adminCtx, registerTeleport } from '../game/admin';
 import { getPlayerSpawn } from '../game/quakeMaps';
-import { leftAb, rightAb, isBinding, bindTo, wheelStep, adsState } from '../game/loadout';
-import { placeBuildPiece } from '../game/placeBuild';
+import { adsState } from '../game/loadout';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -183,7 +182,7 @@ export const Player = () => {
       }
       if (st.hubOpen) return; // hub owns the screen — game keys sleep
       if (e.code === 'KeyE') { if (!e.repeat) st.setSpellWheel(true); return; } // hold E → spell wheel
-      if (e.code === 'KeyQ') {                                                  // V7 $SOUL: tap w/ position = close, hold = rose
+      if (e.code === 'KeyQ' && !st.editorMode) {                                // V7 $SOUL (в стройке Q крутит деталь)
         if (e.repeat) return;
         if (st.position) { st.closePosition(marketNow.price); playHitTick(); }
         else st.setMarketWheel(true);
@@ -192,7 +191,7 @@ export const Player = () => {
       if (e.code === 'KeyP') { st.setBuyMenu(!st.buyMenuOpen); return; }        // CS buy menu
       if (e.code === 'KeyN') { st.setWorkbench(!st.workbenchOpen); return; }    // V8 Ф3: мастерская
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
-      if (e.code === 'KeyB') { st.toggleEditor(); return; }
+      if (e.code === 'KeyR') { st.toggleEditor(); return; }   // СТРОЙКА — только R
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
       if (e.code === 'KeyT') {
         // Universal interact: car enter/exit first (WS-B), else tame (WS-E).
@@ -251,7 +250,13 @@ export const Player = () => {
       if (!isPlaying) return;
       const st = useStore.getState();
       if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen || st.workbenchOpen || st.hubOpen) return;
-      wheelStep(e.deltaY > 0 ? 1 : -1); // ЛОАДАУТ: листаем; клик мышью привяжет
+      const n = WEAPONS.length;
+      const dir = e.deltaY > 0 ? 1 : -1;
+      let i = st.currentWeapon;
+      for (let step = 0; step < n; step++) {
+        i = (i + dir + n) % n;
+        if (st.ownedWeapons[i]) { st.setWeapon(i); break; }
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -687,31 +692,11 @@ export const Player = () => {
       }
     }
 
-    // ── ЛОАДАУТ: что на какой кнопке; во время листания клик ПРИВЯЗЫВАЕТ ────
-    const abL = leftAb(), abR = rightAb();
-    const binding = isBinding();
-    const lmbEdge = keys.shoot && !prevShoot.current;
-    const rmbEdge = keys.grapple && !prevGrapple.current;
-    if (binding && (lmbEdge || rmbEdge)) {
-      const a = bindTo(lmbEdge ? 'left' : 'right');
-      if (a.kind === 'weapon' && a.weapon !== undefined) useStore.getState().setWeapon(a.weapon);
-      playHitTick();
-    } else if (!binding) {
-      if (lmbEdge && abL.kind === 'weapon' && abL.weapon !== undefined) useStore.getState().setWeapon(abL.weapon);
-      if (rmbEdge && abR.kind === 'weapon' && abR.weapon !== undefined) useStore.getState().setWeapon(abR.weapon);
-    }
-    const grabHeld = !binding && ((abL.kind === 'grapple' && keys.shoot) || (abR.kind === 'grapple' && keys.grapple));
-    const grabEdge = !binding && ((abL.kind === 'grapple' && lmbEdge) || (abR.kind === 'grapple' && rmbEdge));
-    const aimHeld = !binding && ((abL.kind === 'aim' && keys.shoot) || (abR.kind === 'aim' && keys.grapple));
-    const fireHeld = !binding && ((abL.kind === 'weapon' && keys.shoot) || (abR.kind === 'weapon' && keys.grapple));
-    const buildAb = !binding && abL.kind === 'build' && lmbEdge ? abL
-      : !binding && abR.kind === 'build' && rmbEdge ? abR : null;
-    if (buildAb?.asset) {
-      if (placeBuildPiece(buildAb.asset, camera, scene, useStore.getState().editorScale)) {
-        playHitTick(); addTrauma(0.06);
-      }
-    }
-    adsState.v += ((aimHeld ? 1 : 0) - adsState.v) * Math.min(1, delta * 12);
+    // КЛАССИКА: ЛКМ — огонь · ПКМ — крюк · Shift — прицел · колесо — стволы
+    const grabHeld = !editorMode && keys.grapple;
+    const grabEdge = grabHeld && !prevGrapple.current;
+    const fireHeld = keys.shoot;
+    adsState.v += ((keys.aim && !editorMode ? 1 : 0) - adsState.v) * Math.min(1, delta * 12);
     prevShoot.current = keys.shoot;
 
     // --- Grappling hook (right mouse): latch a surface, then reel + swing ---
