@@ -17,11 +17,22 @@ const RATE = [+0.001, +0.013, +0.006, -0.010, -0.016, +0.005];
 export const epochAmp = (epochIdx: number): number =>
   0.5 + 2.0 * hash01(0xf00d, epochIdx) ** 2;
 
-// incremental prefix sum of completed epochs (cheap, extends as time passes)
+// V8.6: the integral is anchored to the CURRENT TRADING DAY's start
+// (48 epochs = 8 cycles = 600s exactly). Naive integration from epoch 0
+// underflows exp() to a permanent $0 at wall-clock worldT (~5e7s → lp≈−15556)
+// and burns ~4M loop iterations on the first call. Day-anchored, lp stays
+// O(0.2), the loop is ≤48 iterations, and the market reliably opens near
+// $1000 every day — exactly what «▸ РЫНОК ОТКРЫТ» promises.
+let cachedDay = -1;
 let sumUpto = 0;
 let sumVal = 0;
 function logPBase(epochIdx: number): number {
-  if (epochIdx < sumUpto) { sumUpto = 0; sumVal = 0; }
+  const dayStart = Math.floor(epochIdx / 48) * 48;
+  if (dayStart !== cachedDay || epochIdx < sumUpto) {
+    cachedDay = dayStart;
+    sumUpto = dayStart;
+    sumVal = 0;
+  }
   while (sumUpto < epochIdx) {
     const e = sumUpto % N;
     sumVal += RATE[e] * EPOCH_DUR[e] * epochAmp(sumUpto);
