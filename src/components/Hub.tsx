@@ -16,6 +16,7 @@ import { getCity } from '../game/cityscape';
 import { DRAGONS } from '../game/voxDragon';
 import { playSuction, playHitTick } from '../utils/audio';
 import { gunState } from '../game/gunState';
+import { MAPS, currentMap, setMapInUrl } from '../config/maps';
 
 /**
  * V8.5 П1 — THE HUB (Tab). Максимум песочницы на одном КЛИКАБЕЛЬНОМ экране:
@@ -158,6 +159,16 @@ export const Hub = () => {
               ))}
               <div className={btn} onClick={() => st().addMoney(100000)}>+$100K</div>
               <div className={btn} onClick={() => { gunState.therm = 0; }}>ОСТУДИТЬ СТВОЛ</div>
+            </div>
+            {/* КВЕЙК-АРЕНЫ: смена карты (перезагрузка мира) */}
+            <div className="font-mono text-[10px] uppercase text-white/40 mt-3 mb-1">Карта (сменить = перезайти):</div>
+            <div className="flex flex-wrap gap-1">
+              {MAPS.map((m) => (
+                <div key={m.id} className={currentMap() === m.id ? btnOn : btn} style={{ borderColor: `${m.color}66` }}
+                     onClick={() => { if (currentMap() !== m.id) { setMapInUrl(m.id); window.location.reload(); } }}>
+                  {m.name}
+                </div>
+              ))}
             </div>
           </Section>
 

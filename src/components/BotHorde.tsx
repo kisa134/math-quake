@@ -17,6 +17,8 @@ import { chron } from '../game/chronicle';
 import { conductorState, hash01 } from '../game/conductor';
 import { tryPortal } from '../game/portals';
 import { ROAD_DECK, ROAD_DECK_TOP } from '../config/trackSpline';
+import { getSpawnAnchors } from '../game/quakeMaps';
+import { isArena } from '../config/maps';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -52,11 +54,9 @@ export function spawnBotWave(count: number, round: number) { _spawn?.(count, rou
 export function adminSpawnBot(mutId: string, x: number, y: number, z: number, ambient?: boolean) { _adminSpawn?.(mutId, x, y, z, ambient); }
 export function aliveBotCount() { return _aliveCount; }
 
-// V6 Ш2: орда лезет из ЖЕРЛА и с углов Торгового Пола
-const SPAWN_ANCHORS: [number, number, number][] = [
-  [0, 86, 0], [0, 86, 0], [0, 86, 0], // Жерло — главный поток
-  [100, 86, 100], [-100, 86, 100], [100, 86, -100], [-100, 86, -100],
-];
+// V6 Ш2: орда лезет из ЖЕРЛА и с углов Торгового Пола.
+// КВЕЙК-АРЕНЫ: у арен свои точки — карта решает.
+const SPAWN_ANCHORS: [number, number, number][] = getSpawnAnchors();
 
 // V7.5 Ц2 — АМБИЕНТ-СЛОЙ: мир живёт и без раундов. Три сцены жизни.
 const AMBIENT_TARGET = 14;
@@ -268,9 +268,10 @@ export const BotHorde = () => {
         addTrauma(0.25);
       }
 
-      // V7.5 Ц2: ambient upkeep — пары-дуэлянты и бродилки по трём сценам
+      // V7.5 Ц2: ambient upkeep — пары-дуэлянты и бродилки по трём сценам.
+      // КВЕЙК-АРЕНЫ: амбиента нет — чистые раунды как в квейке.
       const nowUp = performance.now();
-      if (nowUp - lastAmbient.current > 2000) {
+      if (!isArena() && nowUp - lastAmbient.current > 2000) {
         lastAmbient.current = nowUp;
         let ambientCount = 0;
         for (const b of bots.current) if (b.ambient) ambientCount++;

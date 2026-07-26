@@ -10,6 +10,7 @@ import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { noteKill } from '../game/tradingDay';
 import { modMults, SOCKETS } from '../config/weaponMods';
 import { adminCtx, registerTeleport } from '../game/admin';
+import { getPlayerSpawn } from '../game/quakeMaps';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -76,12 +77,8 @@ const BOOT_DIRS = [
 
 // Spawn on the CORE spire platform (y≈81), offset from its centre pad + a small
 // random jitter so two players don't stack — fixes the endless jump-pad bounce
-// you got spawning in the middle of the arena.
-const SPAWN: [number, number, number] = [
-  12 + (Math.random() - 0.5) * 12,
-  84,
-  12 + (Math.random() - 0.5) * 12,
-];
+// you got spawning in the middle of the arena. КВЕЙК-АРЕНЫ: точка из карты.
+const SPAWN: [number, number, number] = getPlayerSpawn();
 const _endPoint = new THREE.Vector3();
 const _laserStartPoint = new THREE.Vector3(0.3, -0.3, -1);
 

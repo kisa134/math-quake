@@ -46,6 +46,8 @@ import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
 import { Portals } from './Portals';
+import { QuakeArena } from './QuakeArena';
+import { isArena, currentMap, type MapId } from '../config/maps';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -136,6 +138,8 @@ const GameManager = () => {
 };
 
 export const Game = () => {
+  // КВЕЙК-АРЕНЫ: арены монтируют ТОЛЬКО бой — тяжёлый мир пончика выключен
+  const arena = isArena();
   return (
     <Canvas 
       shadows={false} 
@@ -157,34 +161,35 @@ export const Game = () => {
         />
 
         <Arena />
-        <TradingFloor />
-        <Cityscape />
-        <Dreamscape />
-        <BlackHole />
-        <MovingAverages />
-        <VoxelCandles />
+        {arena && <QuakeArena map={currentMap() as Exclude<MapId, 'donut'>} />}
+        {!arena && <TradingFloor />}
+        {!arena && <Cityscape />}
+        {!arena && <Dreamscape />}
+        {!arena && <BlackHole />}
+        {!arena && <MovingAverages />}
+        {!arena && <VoxelCandles />}
         <Player />
         <LocalMinions />
         <RemotePlayers />
         <Enemies />
         <NetEnemies />
         <BotHorde />
-        <Dragons />
+        {!arena && <Dragons />}
         <BuffOrbs />
         <Ragdolls />
         <ShockRings />
-        <Euphoria />
-        <LowerSwarm />
-        <UpperSwarm />
-        <HighSwarm />
-        <PhysProps />
-        <Totems />
-        <ChromeIdols />
+        {!arena && <Euphoria />}
+        {!arena && <LowerSwarm />}
+        {!arena && <UpperSwarm />}
+        {!arena && <HighSwarm />}
+        {!arena && <PhysProps />}
+        {!arena && <Totems />}
+        {!arena && <ChromeIdols />}
         <Portals />
-        <Creatures />
+        {!arena && <Creatures />}
         <WorldEntities />
-        <Train />
-        <Cars />
+        {!arena && <Train />}
+        {!arena && <Cars />}
         <PlacedProps />
         <Editor />
         <Projectiles />

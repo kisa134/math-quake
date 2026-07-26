@@ -17,6 +17,8 @@ import { MarketStrip } from './MarketStrip';
 import { ClosingBell } from './ClosingBell';
 import { Workbench } from './Workbench';
 import { Hub } from './Hub';
+import { MapSelect } from './MapSelect';
+import { currentMap, setMapInUrl } from '../config/maps';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -30,14 +32,19 @@ export const UI = () => {
   const weaponName = weaponNameOf(currentWeapon);
   const propName = getAsset(editorSelect).label;
 
-  // Auto-enter (no menu). Room from ?room= (default 'arena'); a friend on the
-  // same link + same room joins your match.
+  // КВЕЙК-АРЕНЫ: если в URL нет ?map= — сначала экран выбора карты. Карта
+  // ВШИВАЕТСЯ в id комнаты, так что друг по твоей ссылке всегда в твоём мире.
+  const [mapChosen, setMapChosen] = useState<boolean>(() => {
+    try { return new URLSearchParams(window.location.search).has('map'); } catch { return true; }
+  });
   useEffect(() => {
+    if (!mapChosen) return;
     const room = new URLSearchParams(window.location.search).get('room') || 'arena';
-    setRoomId(room);
-    initMultiplayer(room);
+    const fullRoom = `${room}-${currentMap()}`;
+    setRoomId(fullRoom);
+    initMultiplayer(fullRoom);
     startGame();
-  }, [setRoomId, startGame]);
+  }, [mapChosen, setRoomId, startGame]);
 
   // Track pointer lock → click-to-play overlay (losing lock never ejects).
   useEffect(() => {
@@ -140,6 +147,13 @@ export const UI = () => {
           <div className="text-[10px] font-mono text-white/60 mt-1 uppercase tracking-widest">SCROLL piece · R rotate 90° · [ ] size · G static/phys &nbsp;|&nbsp; GRID SNAP · LMB place · RMB delete · B exit</div>
         </div>
       )}
+
+      {/* КВЕЙК-АРЕНЫ: стартовый выбор карты (нет ?map= в URL) */}
+      {!mapChosen && <MapSelect onPick={(id) => {
+        setMapInUrl(id);
+        if (id === 'donut') setMapChosen(true);      // мир уже смонтирован — входим
+        else window.location.reload();                // арены монтируются с чистого листа
+      }} />}
 
       {/* V8.5: the clickable HUB (Tab) — everything the game has, one screen */}
       <Hub />
