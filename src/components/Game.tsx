@@ -41,6 +41,7 @@ import { ShockRings } from './ShockRings';
 import { Euphoria } from './Euphoria';
 import { LowerSwarm } from './LowerSwarm';
 import { UpperSwarm } from './UpperSwarm';
+import { HighSwarm } from './HighSwarm';
 import { PhysProps } from './PhysProps';
 import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
@@ -175,6 +176,7 @@ export const Game = () => {
         <Euphoria />
         <LowerSwarm />
         <UpperSwarm />
+        <HighSwarm />
         <PhysProps />
         <Totems />
         <ChromeIdols />

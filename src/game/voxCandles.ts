@@ -115,6 +115,44 @@ export function generateVoxCandles(seed = 0xcafe): VoxData {
   for (let i = 0; i < 68; i++) addCandle(1, 850, 1300);
   for (let i = 0; i < 38; i++) addCandle(2, 1600, 2400);
 
+  // V8.5 П4 — THE TITANS: 12 giant souls (ids 180-191, APPEND ONLY — the
+  // capitulation cascade anchor is hardcoded to the first 74 inner ids).
+  // Belt 1 radii, voxScale 5-7 — читаются с другого края карты. Гигантизм.
+  for (let i = 0; i < 12; i++) {
+    const bull = rnd() > 0.45;
+    const bodyH = 12 + Math.floor(rnd() * 5);
+    const wickUp = 4 + Math.floor(rnd() * 3);
+    const wickDn = 2 + Math.floor(rnd() * 2);
+    const start = vox;
+    const s = VOX_SIZE;
+    for (let by = 0; by < bodyH; by++)
+      for (let bx = -1; bx <= 1; bx++)
+        for (let bz = -1; bz <= 1; bz++) {
+          localArr.push(bx * s, (by + 0.5) * s, bz * s);
+          shadeArr.push(0.75 + rnd() * 0.4);
+          vox++;
+        }
+    for (let wy = 0; wy < wickUp; wy++) { localArr.push(0, (bodyH + wy + 0.5) * s, 0); shadeArr.push(0.9 + rnd() * 0.25); vox++; }
+    for (let wy = 0; wy < wickDn; wy++) { localArr.push(0, -(wy + 0.5) * s, 0); shadeArr.push(0.9 + rnd() * 0.25); vox++; }
+    const R = 900 + rnd() * 500;
+    candles.push({
+      id: candles.length,
+      pos: [0, 0, 0],
+      bull,
+      phase: rnd() * Math.PI * 2,
+      voxStart: start,
+      voxCount: vox - start,
+      orbitR: R,
+      angSpeed: (6 + rnd() * 6) / R, // тяжёлые — медленнее
+      incSin: Math.sin((rnd() - 0.5) * 1.0),
+      incCos: Math.cos((rnd() - 0.5) * 1.0),
+      belt: 1,
+      voxScale: 5 + rnd() * 2,
+      phiR: rnd() * Math.PI * 2,
+      patronIdx: -1, // титан не следует ни за кем
+    });
+  }
+
   // patrons: every non-whale follows a whale of its own belt (кит ведёт шлейф)
   for (let belt = 0; belt < 3; belt++) {
     const whales = candles.filter((c) => c.belt === belt && c.voxScale === 1.5);
