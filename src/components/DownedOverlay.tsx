@@ -9,9 +9,10 @@ import { useStore } from '../store';
 export const DownedOverlay = () => {
   const crippledUntil = useStore((s) => s.crippledUntil);
   const downedUntil = useStore((s) => s.downedUntil);
+  const armsUntil = useStore((s) => s.armsUntil);
   const [, force] = useState(0);
 
-  const active = Date.now() < Math.max(crippledUntil, downedUntil);
+  const active = Date.now() < Math.max(crippledUntil, downedUntil, armsUntil);
   useEffect(() => {
     if (!active) return;
     const iv = setInterval(() => force((x) => x + 1), 100);
@@ -21,7 +22,8 @@ export const DownedOverlay = () => {
   const now = Date.now();
   const downed = downedUntil > now;
   const crippled = !downed && crippledUntil > now;
-  if (!downed && !crippled) return null;
+  const armsOut = !downed && armsUntil > now; // V9 К: руки прострелены
+  if (!downed && !crippled && !armsOut) return null;
 
   const left = downed ? (downedUntil - now) / 3500 : (crippledUntil - now) / 4200;
 
@@ -30,9 +32,22 @@ export const DownedOverlay = () => {
       <div className="absolute inset-0" style={{
         background: downed
           ? 'radial-gradient(circle at center, rgba(120,0,20,0.25) 20%, rgba(40,0,8,0.92) 100%)'
-          : `radial-gradient(circle at center, rgba(255,45,85,0) 35%, rgba(160,10,35,${0.35 + left * 0.25}) 100%)`,
+          : crippled
+            ? `radial-gradient(circle at center, rgba(255,45,85,0) 35%, rgba(160,10,35,${0.35 + left * 0.25}) 100%)`
+            : 'radial-gradient(circle at center, rgba(255,140,20,0) 45%, rgba(150,70,10,0.28) 100%)',
         transition: 'background 120ms linear',
       }} />
+      {armsOut && !crippled && (
+        <div className="absolute inset-x-0 bottom-[38%] flex flex-col items-center">
+          <div className="font-black text-2xl tracking-[0.35em] uppercase text-amber-300"
+               style={{ textShadow: '0 0 22px rgba(255,160,45,0.8)', opacity: 0.55 + Math.sin(now * 0.01) * 0.25 }}>
+            руки прострелены
+          </div>
+          <div className="font-mono text-[11px] uppercase tracking-widest text-white/50 mt-1">
+            ствол гуляет · темп упал
+          </div>
+        </div>
+      )}
       {crippled && (
         <div className="absolute inset-x-0 bottom-[38%] flex flex-col items-center">
           <div className="font-black text-2xl tracking-[0.35em] uppercase text-rose-300"

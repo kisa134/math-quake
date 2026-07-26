@@ -95,6 +95,35 @@ export function makeGore(
   return out;
 }
 
+// ---------------------- V9 К: KENSHI — ПРИЦЕЛ ПО КОНЕЧНОСТЯМ ----------------
+/** Зона тела, в которую пришёлся выстрел. */
+export type LimbZone = 'legs' | 'arms' | 'body' | 'head';
+
+/** VoxDude рисуется ступнями в НУЛЕ своей группы; корневая группа игрока стоит
+ *  в центре капсулы (половина роста = 1) → ступни на root.y − 1. */
+export const DUDE_FEET_Y = -1;
+
+const _zoneP = new THREE.Vector3();
+/**
+ * Куда попал выстрел, если целиться в бойца. Точка переводится в локальные
+ * координаты его группы (сама снимает поворот и масштаб L/K), затем читается
+ * по анатомии вокс-чувака: ноги 0…0.7, торс/руки 0.7…1.4 (по бокам — РУКИ,
+ * как в Kenshi), голова выше 1.4.
+ */
+export function limbZoneAt(root: THREE.Object3D, point: THREE.Vector3): LimbZone {
+  _zoneP.copy(point);
+  root.worldToLocal(_zoneP);
+  const y = _zoneP.y - DUDE_FEET_Y;      // высота от ступней
+  if (y < 5.2 * VOXEL) return 'legs';    // ниже таза
+  if (y > 9.9 * VOXEL) return 'head';    // выше шеи
+  return Math.abs(_zoneP.x) > 2 * VOXEL ? 'arms' : 'body';
+}
+
+/** Множитель урона по зоне: голова карает, конечности берут меньше. */
+export const ZONE_DMG: Record<LimbZone, number> = {
+  head: 1.7, body: 1, arms: 0.7, legs: 0.8,
+};
+
 // Cross-module inbox: socket pushes every player 'hit' here; RemotePlayers
 // drains it each frame → gore burst + possible limb pop on the victim's model.
-export const goreInbox: { targetId: string; damage: number }[] = [];
+export const goreInbox: { targetId: string; damage: number; limb?: LimbZone }[] = [];

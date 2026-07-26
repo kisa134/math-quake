@@ -83,6 +83,7 @@ interface PlayerState {
   avatar?: string; // selected third-person figure (WS-5)
   money?: number;  // V4 TOP BAG leaderboard
   dragon?: number | null; // V4.1: dragon id this player is riding
+  scale?: number;  // V9 Р: его рост (L/K) — гигант виден гигантом
 }
 
 interface GameState {
@@ -164,11 +165,16 @@ interface GameState {
   spawnEnemy: () => void;
   damageEnemy: (id: string, amount: number, pos?: [number, number, number]) => void;
   removeEnemy: (id: string) => void;
-  takeDamage: (amount: number) => void;
+  takeDamage: (amount: number, limb?: string) => void;
   // V9 Б: контузия (отстрелили ноги — ползёшь) и добивание (камера доминации)
   crippledUntil: number;
   downedUntil: number;
+  // V9 К: Kenshi — отстреленные РУКИ (ствол пляшет, темп падает)
+  armsUntil: number;
   reviveMe: () => void;
+  // V9 Р: свой рост — L больше, K меньше (песочница гигантов)
+  bodyScale: number;
+  setBodyScale: (s: number) => void;
   addProjectile: (p: Omit<Projectile, 'id' | 'createdAt'>) => void;
   removeProjectile: (id: string) => void;
   addDamageNumber: (pos: [number, number, number], amount: number, color?: string) => void;
@@ -216,6 +222,8 @@ export const useStore = create<GameState>((set) => ({
   jetpackStunUntil: 0,
   crippledUntil: 0,
   downedUntil: 0,
+  armsUntil: 0,
+  bodyScale: 1,
   god: true,              // immortal by default (admin sandbox)
   editorMode: false,
   editorSelect: isTower() ? 'gcandle' : 'pad',
@@ -345,20 +353,28 @@ export const useStore = create<GameState>((set) => ({
     enemies: state.enemies.filter(e => e.id !== id)
   })),
   
-  takeDamage: (amount) => set((state) => {
+  takeDamage: (amount, limb) => set((state) => {
     addTrauma(0.3); // getting hit kicks the camera
     const jetpackStunUntil = Date.now() + 1200; // a hit knocks the jetpack out briefly
     if (state.god) return { jetpackStunUntil }; // immortal: feel the hit, never lose HP
     const newHealth = Math.max(0, state.health - amount);
-    // тяжёлое попадание = КОНТУЗИЯ: ноги отстрелены, ползёшь и мир плывёт
-    const crippledUntil = amount >= 26 ? Date.now() + 4200 : state.crippledUntil;
+    // V9 К (Kenshi): куда попали — то и отказывает.
+    //   НОГИ → контузия, ползёшь;  РУКИ → ствол пляшет и темп падает.
+    const now = Date.now();
+    let crippledUntil = state.crippledUntil;
+    let armsUntil = state.armsUntil;
+    if (limb === 'legs' && amount >= 10) crippledUntil = Math.max(crippledUntil, now + 5200);
+    else if (limb === 'arms' && amount >= 10) armsUntil = Math.max(armsUntil, now + 5200);
+    else if (amount >= 26) crippledUntil = Math.max(crippledUntil, now + 4200); // тяжёлый удар валит и так
     if (newHealth === 0) {
       // ДОБИВАНИЕ: 3.5с своей камерой снизу смотришь на того, кто тебя добил
-      return { health: 0, downedUntil: Date.now() + 3500, crippledUntil, jetpackStunUntil };
+      return { health: 0, downedUntil: now + 3500, crippledUntil, armsUntil, jetpackStunUntil };
     }
-    return { health: newHealth, crippledUntil, jetpackStunUntil };
+    return { health: newHealth, crippledUntil, armsUntil, jetpackStunUntil };
   }),
-  reviveMe: () => set({ health: 100, downedUntil: 0, crippledUntil: 0 }),
+  reviveMe: () => set({ health: 100, downedUntil: 0, crippledUntil: 0, armsUntil: 0 }),
+  // V9 Р: рост игрока. 0.25× — мышь, 12× — колосс над свечами.
+  setBodyScale: (s) => set({ bodyScale: Math.max(0.25, Math.min(12, s)) }),
 
   addProjectile: (p) => set((state) => ({
     projectiles: [...state.projectiles, { ...p, id: Math.random().toString(36).substring(2, 9), createdAt: Date.now() }]

@@ -82,5 +82,13 @@ export const getAsset = (id: string): AssetSpec => ASSET_BY_ID[id] ?? ASSET_BY_I
 ASSETS.forEach((a) => { a.buildable = true; });
 
 export const ASSET_IDS = ASSETS.map((a) => a.id);
+/** Колесо стройки начинается с того, чем строят БОЛЬШЕ ВСЕГО: две свечи, потом
+ *  БАТУТ (третьим — чтобы прыгалка была под пальцем), дальше всё остальное. */
+const WHEEL_FIRST = ['gcandle', 'gcandle_b', 'pad'];
 /** Editor-palette ids: cheap primitive build pieces only (no model loads). */
-export const BUILD_IDS = ASSETS.filter((a) => a.buildable).map((a) => a.id);
+export const BUILD_IDS = ASSETS.filter((a) => a.buildable)
+  .map((a) => a.id)
+  .sort((a, b) => {
+    const ia = WHEEL_FIRST.indexOf(a), ib = WHEEL_FIRST.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });

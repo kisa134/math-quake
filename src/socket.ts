@@ -86,10 +86,11 @@ export const initMultiplayer = (roomId: string) => {
     if (!payload) return;
     // The shooter broadcasts a hit on targetId; the target applies its own damage.
     if (payload.targetId === myId) {
-      useStore.getState().takeDamage(payload.damage);
+      useStore.getState().takeDamage(payload.damage, payload.limb);
     }
-    // Everyone sees the GORE on the victim's voxel dude (V3.2).
-    goreInbox.push({ targetId: payload.targetId, damage: payload.damage });
+    // Everyone sees the GORE on the victim's voxel dude (V3.2) — и ИМЕННО ту
+    // конечность, в которую попали (V9 К).
+    goreInbox.push({ targetId: payload.targetId, damage: payload.damage, limb: payload.limb });
   });
 
   // --- shared enemies (host-authoritative) ---

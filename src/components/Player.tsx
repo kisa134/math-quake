@@ -20,7 +20,7 @@ import { WeaponModel } from './WeaponModel';
 import { BUILD_IDS } from '../config/assets';
 import { getSpell } from '../config/spells';
 import { VoxDude } from './VoxDude';
-import { makeGore } from '../game/voxHumanoid';
+import { makeGore, limbZoneAt, ZONE_DMG, type LimbZone } from '../game/voxHumanoid';
 import { trainVelocity } from './Train';
 import { carPositions, tryToggleCar } from './Cars';
 import { grappleCityHits } from './Cityscape';
@@ -122,6 +122,8 @@ export const Player = () => {
   const prevShoot = useRef(false);  // ЛОАДАУТ: фронт ЛКМ
   const downedRef = useRef(false);  // V9 Б: добит — сцена доминации
   const crippledRef = useRef(false);// V9 Б: контужен — ползёшь
+  const armsRef = useRef(false);    // V9 К: руки прострелены — ствол пляшет
+  const scaleRef = useRef(1);       // V9 Р: свой рост (L больше / K меньше)
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
 
@@ -161,6 +163,7 @@ export const Player = () => {
 
   const [isThirdPerson, setIsThirdPerson] = useState(false);
   const thirdPersonRef = useRef<THREE.Group>(null);
+  const bodyScale = useStore((s) => s.bodyScale); // V9 Р: капсула растёт вместе с тобой
   
   // Input: spell wheel (hold E), boots (C), build (B), 3rd-person (V), weapon
   // digits/wheel. Merged across WS-2 (wheel), WS-3 (E spell wheel), WS-4 (C boots).
@@ -192,6 +195,20 @@ export const Player = () => {
       if (e.code === 'KeyN') { st.setWorkbench(!st.workbenchOpen); return; }    // V8 Ф3: мастерская
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyR') { st.toggleEditor(); return; }   // СТРОЙКА — только R
+      // V9 Р: РОСТ. L — расти, K — уменьшаться. Тело поднимаем на разницу,
+      // чтобы новая капсула не выросла сквозь пол.
+      if (e.code === 'KeyL' || e.code === 'KeyK') {
+        const before = st.bodyScale;
+        st.setBodyScale(e.code === 'KeyL' ? before * 1.25 : before / 1.25);
+        const after = useStore.getState().bodyScale;
+        const b = playerRef.current;
+        if (b && after > before) {
+          const t = b.translation();
+          b.setTranslation({ x: t.x, y: t.y + (after - before) * 1.05, z: t.z }, true);
+        }
+        playHitTick();
+        return;
+      }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
       if (e.code === 'KeyT') {
         // Universal interact: car enter/exit first (WS-B), else tame (WS-E).
@@ -372,14 +389,15 @@ export const Player = () => {
             const ud = h.object.userData;
             let o: THREE.Object3D | null = h.object;
             let pid: string | null = null;
-            while (o) { if (o.userData?.isEnemy && o.userData?.isPlayer) { pid = o.userData.id; break; } o = o.parent; }
+            let pLimb: LimbZone = 'body';
+            while (o) { if (o.userData?.isEnemy && o.userData?.isPlayer) { pid = o.userData.id; pLimb = limbZoneAt(o, h.point); break; } o = o.parent; }
             const dmg = 26;
             if (ud?.isBot) {
               if (useStore.getState().isHost) botHitInbox.push({ id: +ud.id, damage: dmg });
               else socket.emit('bhit', { id: +ud.id, damage: dmg });
             } else if (ud?.isCreature) damageCreature(ud.id, dmg);
             else if (ud?.isVoxCandle) carveVoxCandle(+ud.id, h.point.x, h.point.y, h.point.z, 2.6);
-            else if (pid) socket.emit('hit', { targetId: pid, damage: dmg });
+            else if (pid) socket.emit('hit', { targetId: pid, damage: Math.round(dmg * ZONE_DMG[pLimb]), limb: pLimb });
             else if (ud?.isEnemy && ud.id) {
               if (useStore.getState().isHost) useStore.getState().damageEnemy(ud.id, dmg, [h.point.x, h.point.y, h.point.z]);
               else socket.emit('ehit', { id: ud.id, damage: dmg, point: [h.point.x, h.point.y, h.point.z] });
@@ -440,13 +458,15 @@ export const Player = () => {
       camera.position.set(currentPos.x, currentPos.y + 0.8, currentPos.z).add(offset);
       
       if (thirdPersonRef.current) {
-        thirdPersonRef.current.position.set(currentPos.x, currentPos.y - 1, currentPos.z);
+        thirdPersonRef.current.scale.setScalar(scaleRef.current); // V9 Р
+        thirdPersonRef.current.position.set(currentPos.x, currentPos.y - scaleRef.current, currentPos.z);
         const eul = new THREE.Euler().setFromQuaternion(camera.quaternion, "YXZ");
         thirdPersonRef.current.rotation.set(0, eul.y, 0);
       }
     } else {
       // V9 Б: ползком глаза ниже, при добивании — щекой в пол
-      const eyeY = downedRef.current ? 0.18 : crippledRef.current ? 0.42 : 0.8;
+      // V9 Р: и всё это ×рост — гигант смотрит с высоты своего тела
+      const eyeY = (downedRef.current ? 0.18 : crippledRef.current ? 0.42 : 0.8) * scaleRef.current;
       camera.position.set(currentPos.x, currentPos.y + eyeY, currentPos.z); // Eye level
       if (downedRef.current) {
         // смотрим на ближайшего живого — он и есть твой палач
@@ -675,12 +695,21 @@ export const Player = () => {
     }
     clampHorizontal(_moveVel);
 
+    // V9 Р: шаг по росту — колосс шагает шире, мышь семенит (×1 при обычном
+    // размере, так что базовый фил движения не тронут).
+    if (scaleRef.current !== 1) {
+      const k = Math.sqrt(scaleRef.current);
+      _moveVel.x *= k; _moveVel.z *= k;
+    }
+
     // ── V9 Б: КОНТУЗИЯ и ДОБИВАНИЕ ─────────────────────────────────────────
     {
       const stx = useStore.getState();
       const nowMs = Date.now();
       downedRef.current = stx.downedUntil > nowMs;
       crippledRef.current = !downedRef.current && stx.crippledUntil > nowMs;
+      armsRef.current = !downedRef.current && stx.armsUntil > nowMs; // V9 К
+      scaleRef.current = stx.bodyScale;                              // V9 Р
       if (downedRef.current) {
         _moveVel.x = 0; _moveVel.z = 0;   // ты лежишь. смотри, как тебя добили
       } else if (crippledRef.current) {
@@ -824,6 +853,12 @@ export const Player = () => {
         const time = now * 0.001;
         weaponRef.current.position.y += Math.sin(time * swaySpeed) * swayAmount;
       }
+      // V9 К: прострелены руки — ствол виснет, дрожит и заваливается набок
+      if (armsRef.current) {
+        weaponRef.current.position.y -= 0.13;
+        weaponRef.current.rotateZ(0.34 + Math.sin(now * 0.011) * 0.07);
+        weaponRef.current.rotateX(0.2 + Math.sin(now * 0.017) * 0.05);
+      }
     }
 
     // Muzzle-flash fade
@@ -876,6 +911,7 @@ export const Player = () => {
     const mm = modMults(useStore.getState().weaponMods[currentWeapon]);
     let effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
     effRate *= mm.rate;
+    if (armsRef.current) effRate *= 1.8;                             // V9 К: руки не слушаются
     if (useStore.getState().buffs.rage > Date.now()) effRate /= 1.6; // RAGE: тратата быстрее
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
@@ -1006,7 +1042,8 @@ export const Player = () => {
                 const eid = obj.userData.id;
                 const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
                 if (obj.userData?.isPlayer) {
-                  socket.emit('hit', { targetId: eid, damage: spell.damage });
+                  const zone = limbZoneAt(obj, hitObj.point);
+                  socket.emit('hit', { targetId: eid, damage: Math.round(spell.damage * ZONE_DMG[zone]), limb: zone });
                   useStore.getState().addDebris(makeGore(hitObj.point.x, hitObj.point.y, hitObj.point.z, 8));
                 }
                 else if (useStore.getState().isHost) {
@@ -1107,6 +1144,11 @@ export const Player = () => {
             spreadY = (Math.random() - 0.5) * effSpread;
           }
           if (sprayOff) { spreadX += sprayOff[0]; spreadY += sprayOff[1]; }
+          // V9 К: прострелены руки — ствол гуляет даже у снайперки
+          if (armsRef.current) {
+            spreadX += (Math.random() - 0.5) * 0.055;
+            spreadY += (Math.random() - 0.5) * 0.055;
+          }
 
           raycaster.current.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
           const intersects = raycaster.current.intersectObjects(scene.children, true);
@@ -1114,6 +1156,7 @@ export const Player = () => {
 
           let hitEnemy = false;
           let targetId: string | null = null;
+          let targetLimb: LimbZone = 'body';
 
           for (const hitObj of intersects) {
             let obj: THREE.Object3D | null = hitObj.object;
@@ -1147,6 +1190,8 @@ export const Player = () => {
               if (obj.userData?.isEnemy) {
                 if (obj.userData?.isPlayer) {
                   targetId = obj.userData.id;
+                  // V9 К: КУДА попал — ноги/руки/корпус/голова (Kenshi)
+                  targetLimb = limbZoneAt(obj, hitObj.point);
                 } else {
                   const eid = obj.userData.id;
                   const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
@@ -1218,9 +1263,14 @@ export const Player = () => {
           }
 
           if (targetId) {
-             socket.emit("hit", { targetId, damage: config.damage });
+             // V9 К: голова карает, конечности берут меньше — но калечат
+             const zoneDmg = Math.round(config.damage * ZONE_DMG[targetLimb]);
+             socket.emit("hit", { targetId, damage: zoneDmg, limb: targetLimb });
              // Draw local damage number for hitting a player
-             useStore.getState().addDamageNumber([_endPoint.x, _endPoint.y, _endPoint.z], config.damage, '#4361ee');
+             useStore.getState().addDamageNumber(
+               [_endPoint.x, _endPoint.y, _endPoint.z], zoneDmg,
+               targetLimb === 'head' ? '#ff2d2d' : targetLimb === 'body' ? '#4361ee' : '#ffd166',
+             );
              // instant voxel GORE at the impact for the shooter (broadcast
              // self:false — everyone else gets it via the 'hit' goreInbox)
              useStore.getState().addDebris(makeGore(_endPoint.x, _endPoint.y, _endPoint.z, 8 + Math.round(config.damage * 0.1)));
@@ -1299,6 +1349,7 @@ export const Player = () => {
         minions: useStore.getState().localMinions,
         avatar: useStore.getState().avatarId,
         money: useStore.getState().money,
+        scale: scaleRef.current,   // V9 Р: друг видит твой настоящий рост
         dragon: null
       });
     }
@@ -1309,7 +1360,7 @@ export const Player = () => {
       <PointerLockControls ref={controlsRef} />
       {isPlaying && (
         <RigidBody ref={playerRef} colliders={false} mass={1} type="dynamic" position={SPAWN} enabledRotations={[false, false, false]}>
-          <CapsuleCollider args={[0.5, 0.5]} />
+          <CapsuleCollider args={[0.5 * bodyScale, 0.5 * bodyScale]} />
         </RigidBody>
       )}
       <group ref={weaponRef}>
@@ -1328,6 +1379,7 @@ export const Player = () => {
       {/* 3rd-person body — the white blocky voxel dude (V3.2), 3rd person only */}
       <group ref={thirdPersonRef} visible={isThirdPerson}>
         <VoxDude
+          weapon={currentWeapon}
           getSpeed={() => {
             const v = playerRef.current?.linvel();
             return v ? Math.hypot(v.x, v.z) : 0;
