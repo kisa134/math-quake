@@ -31,7 +31,7 @@ export function dims(assetId: string, scale: number): { hw: number; hd: number; 
   const spec = getAsset(assetId);
   const s = spec.baseScale * scale;
   switch (spec.prim) {
-    case 'candle':   return { hw: 3 * s, hd: 3 * s, h: 24 * s };
+    case 'candle':   return { hw: 4.5 * s, hd: 4.5 * s, h: 34 * s };
     case 'platform': return { hw: 4 * s, hd: 4 * s, h: 0.4 * s };
     case 'floor':    return { hw: 2 * s, hd: 2 * s, h: 0.4 * s };
     case 'wall':     return { hw: 2 * s, hd: 0.2 * s, h: 3 * s };
@@ -45,14 +45,14 @@ export function dims(assetId: string, scale: number): { hw: number; hd: number; 
 
 export function maxHp(assetId: string, scale: number): number {
   const d = dims(assetId, scale);
-  return Math.max(60, Math.round(HP_PER_SCALE * Math.max(0.5, d.h / 24) * 1.6));
+  return Math.max(60, Math.round(HP_PER_SCALE * Math.max(0.5, d.h / 34) * 1.6));
 }
 
 /** Building costs money — the bigger the candle, the dearer the tower. */
 export function buildCost(assetId: string, scale: number): number {
   const d = dims(assetId, scale);
   const vol = d.hw * d.hd * d.h; // ~54 at scale 1 candle
-  return Math.max(25, Math.round(vol * 0.25));
+  return Math.max(25, Math.round(vol * 0.12));
 }
 
 const overlaps = (a: BuiltPiece, b: BuiltPiece): boolean => {

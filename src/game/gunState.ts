@@ -13,6 +13,7 @@ export const gunState = {
   heat: 0,       // minigun spin-up 0..1 (VoxWeapon barrels read this)
   // V8 Ф2.5 look-lag: per-frame camera yaw/pitch delta (rad) — the viewmodel
   // trails the aim like a real object with mass, then catches up.
+  firedAt: 0,   // performance.now() последнего выстрела — дрожь ствола
   lookX: 0,
   lookY: 0,
 };

@@ -11,6 +11,8 @@ import { noteKill } from '../game/tradingDay';
 import { modMults, SOCKETS } from '../config/weaponMods';
 import { adminCtx, registerTeleport } from '../game/admin';
 import { getPlayerSpawn } from '../game/quakeMaps';
+import { leftAb, rightAb, isBinding, bindTo, wheelStep, adsState } from '../game/loadout';
+import { placeBuildPiece } from '../game/placeBuild';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -118,6 +120,7 @@ export const Player = () => {
   const sprayIdx = useRef(0);
   const heatRef = useRef(0);
   const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
+  const prevShoot = useRef(false);  // ЛОАДАУТ: фронт ЛКМ
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
 
@@ -246,14 +249,7 @@ export const Player = () => {
       if (!isPlaying) return;
       const st = useStore.getState();
       if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen || st.workbenchOpen || st.hubOpen) return;
-      const n = WEAPONS.length;
-      const dir = e.deltaY > 0 ? 1 : -1;
-      // cycle to the next OWNED weapon (you only carry what you bought)
-      let i = st.currentWeapon;
-      for (let step = 0; step < n; step++) {
-        i = (i + dir + n) % n;
-        if (st.ownedWeapons[i]) { st.setWeapon(i); break; }
-      }
+      wheelStep(e.deltaY > 0 ? 1 : -1); // ЛОАДАУТ: листаем; клик мышью привяжет
     };
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -490,7 +486,7 @@ export const Player = () => {
         prevPitchRef.current = pitch;
       }
       const speedFov = Math.min(11, Math.max(0, (spd - 26) * 0.18));
-      const target = 80 + recoilAmt.current * 5 + speedFov;
+      const target = (80 - adsState.v * 30) + recoilAmt.current * 5 + speedFov * (1 - adsState.v * 0.7);
       smoothFov.current += (target - smoothFov.current) * Math.min(1, delta * 7);
       const pc = camera as THREE.PerspectiveCamera;
       if (Math.abs(pc.fov - smoothFov.current) > 0.02) {
@@ -658,10 +654,37 @@ export const Player = () => {
     }
     clampHorizontal(_moveVel);
 
+    // ── ЛОАДАУТ: что на какой кнопке; во время листания клик ПРИВЯЗЫВАЕТ ────
+    const abL = leftAb(), abR = rightAb();
+    const binding = isBinding();
+    const lmbEdge = keys.shoot && !prevShoot.current;
+    const rmbEdge = keys.grapple && !prevGrapple.current;
+    if (binding && (lmbEdge || rmbEdge)) {
+      const a = bindTo(lmbEdge ? 'left' : 'right');
+      if (a.kind === 'weapon' && a.weapon !== undefined) useStore.getState().setWeapon(a.weapon);
+      playHitTick();
+    } else if (!binding) {
+      if (lmbEdge && abL.kind === 'weapon' && abL.weapon !== undefined) useStore.getState().setWeapon(abL.weapon);
+      if (rmbEdge && abR.kind === 'weapon' && abR.weapon !== undefined) useStore.getState().setWeapon(abR.weapon);
+    }
+    const grabHeld = !binding && ((abL.kind === 'grapple' && keys.shoot) || (abR.kind === 'grapple' && keys.grapple));
+    const grabEdge = !binding && ((abL.kind === 'grapple' && lmbEdge) || (abR.kind === 'grapple' && rmbEdge));
+    const aimHeld = !binding && ((abL.kind === 'aim' && keys.shoot) || (abR.kind === 'aim' && keys.grapple));
+    const fireHeld = !binding && ((abL.kind === 'weapon' && keys.shoot) || (abR.kind === 'weapon' && keys.grapple));
+    const buildAb = !binding && abL.kind === 'build' && lmbEdge ? abL
+      : !binding && abR.kind === 'build' && rmbEdge ? abR : null;
+    if (buildAb?.asset) {
+      if (placeBuildPiece(buildAb.asset, camera, scene, useStore.getState().editorScale)) {
+        playHitTick(); addTrauma(0.06);
+      }
+    }
+    adsState.v += ((aimHeld ? 1 : 0) - adsState.v) * Math.min(1, delta * 12);
+    prevShoot.current = keys.shoot;
+
     // --- Grappling hook (right mouse): latch a surface, then reel + swing ---
     if (editorMode) grappleOn.current = false; // RMB deletes props in build mode
     // --- Grapple 2.0: magnetic assist cone — «цепляется всегда» -----------
-    if (!editorMode && keys.grapple && !prevGrapple.current) {
+    if (!editorMode && grabEdge) {
       let anchorDist = Infinity;
       grappleCandleId.current = -1;
       for (const [ax, ay] of ASSIST_OFFSETS) {
@@ -719,7 +742,7 @@ export const Player = () => {
         grappleAnchor.current.z - currentPos.z,
       );
       const dist = _grappleVec.length();
-      if (!keys.grapple || dist < MOVE.grappleRelease) {
+      if (!grabHeld || dist < MOVE.grappleRelease) {
         // release = the FLING: keep momentum + a boost, Spider-Man exit
         grappleOn.current = false;
         _moveVel.multiplyScalar(MOVE.grappleBoost);
@@ -810,7 +833,7 @@ export const Player = () => {
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
     // V4 CS gunfeel: minigun heat (spin-up rate + growing cone) + spray reset
-    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen && !useStore.getState().workbenchOpen;
+    const wantsFire = !editorMode && fireHeld && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen && !useStore.getState().workbenchOpen;
     if (config.heat) {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;
@@ -848,7 +871,23 @@ export const Player = () => {
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
       recoilAmt.current = Math.min(1.2, recoilAmt.current + effRecoil);
-      addTrauma(0.03 + effRecoil * 0.12);
+      addTrauma(0.055 + effRecoil * 0.26);
+      gunState.firedAt = performance.now();
+      // дымок из ствола — каждый 3-й выстрел
+      if (Math.random() < 0.34) {
+        camera.getWorldDirection(_recoilVec);
+        useStore.getState().addDebris([{
+          x: camera.position.x + _recoilVec.x * 1.2,
+          y: camera.position.y - 0.1,
+          z: camera.position.z + _recoilVec.z * 1.2,
+          vx: (Math.random() - 0.5) * 0.7 + _recoilVec.x * 0.6,
+          vy: 1.0 + Math.random() * 0.9,
+          vz: (Math.random() - 0.5) * 0.7 + _recoilVec.z * 0.6,
+          color: '#9c988f', size: 0.07 + Math.random() * 0.07,
+          rx: Math.random() * 3, ry: Math.random() * 3, rz: Math.random() * 3,
+          life: 520 + Math.random() * 320,
+        }]);
+      }
       if (muzzleRef.current) {
         muzzleFade.current = 1;
         muzzleRef.current.visible = true;
@@ -1040,7 +1079,7 @@ export const Player = () => {
         sprayIdx.current++;
         // V8 Ф2: an overheated barrel (therm > 0.75) blooms the cone +30%
         const thermBloom = 1 + Math.max(0, gunState.therm - 0.75) * 1.2;
-        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) * thermBloom * mm.spread : 0;
+        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) * thermBloom * mm.spread * (1 - adsState.v * 0.7) : 0;
 
         for (let r = 0; r < raysToFire; r++) {
           let spreadX = 0;

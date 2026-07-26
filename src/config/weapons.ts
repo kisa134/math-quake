@@ -219,6 +219,12 @@ const SHELLS: WeaponShell[] = [
 ];
 WEAPONS.forEach((w, i) => { w.sonic = SONICS[i]; w.shell = SHELLS[i]; });
 
+// ОРУЖИЕ В 2 РАЗА БОЛЬШЕ (owner): ствол должен занимать кадр
+WEAPONS.forEach((w) => {
+  w.vLen *= 1.95;
+  w.mPos = [w.mPos[0] * 1.25, w.mPos[1] * 1.35 - 0.03, w.mPos[2] * 1.5];
+});
+
 // МАТЕМАТИЧЕСКАЯ БАШНЯ: оружие крупнее и злее — свечи должны РАЗЛЕТАТЬСЯ
 if (isTower()) {
   WEAPONS.forEach((w) => {

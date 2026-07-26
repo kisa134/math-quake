@@ -323,13 +323,13 @@ export const playWeaponSound = (freq: number, sonic?: { body: 'crack' | 'blast' 
   const t = audioCtx.currentTime;
   const out = audioCtx.destination;
 
-  // 1 MECH — 12ms metallic bolt click (the working machine)
+  // 1 MECH — 12ms metallic bolt click (the working machine) [V9: громче]
   {
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
     o.type = 'square';
     o.frequency.value = 2400 + Math.random() * 500;
-    g.gain.setValueAtTime(0.045, t);
+    g.gain.setValueAtTime(0.085, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.012);
     o.connect(g); g.connect(out);
     o.start(t); o.stop(t + 0.012);
@@ -337,20 +337,20 @@ export const playWeaponSound = (freq: number, sonic?: { body: 'crack' | 'blast' 
 
   // 2 BODY — the carrier, per character
   if (s.body === 'crack') {
-    noiseBurst(t, 0.06, 0.22, 'bandpass', 1900, 1.1);
+    noiseBurst(t, 0.07, 0.42, 'bandpass', 1900, 1.1);
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
     o.type = 'square'; o.frequency.setValueAtTime(freq, t);
     o.frequency.exponentialRampToValueAtTime(Math.max(40, freq / 5), t + 0.07);
-    g.gain.setValueAtTime(0.09, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.07);
+    g.gain.setValueAtTime(0.17, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.09);
     o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.07);
   } else if (s.body === 'blast') {
-    noiseBurst(t, 0.12, 0.3, 'lowpass', 900, 0.7);
-    noiseBurst(t, 0.05, 0.12, 'bandpass', 2600, 1.5); // top-end slap
+    noiseBurst(t, 0.15, 0.55, 'lowpass', 900, 0.7);
+    noiseBurst(t, 0.06, 0.24, 'bandpass', 2600, 1.5); // top-end slap
   } else if (s.body === 'zap') {
     const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
     o.type = 'square'; o.frequency.setValueAtTime(freq, t);
     o.frequency.exponentialRampToValueAtTime(Math.max(60, freq / 4), t + 0.08);
-    g.gain.setValueAtTime(0.1, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.08);
+    g.gain.setValueAtTime(0.19, t); g.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
     o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.08);
     noiseBurst(t, 0.02, 0.06, 'highpass', 3200, 0.7); // crystalline fizz
   } else { // bloom — wet electric swell
@@ -361,7 +361,7 @@ export const playWeaponSound = (freq: number, sonic?: { body: 'crack' | 'blast' 
     o.frequency.exponentialRampToValueAtTime(freq * 1.4, t + 0.09);
     o2.frequency.value = freq * 1.502; // detuned partner
     g.gain.setValueAtTime(0.001, t);
-    g.gain.exponentialRampToValueAtTime(0.12, t + 0.03);
+    g.gain.exponentialRampToValueAtTime(0.22, t + 0.03);
     g.gain.exponentialRampToValueAtTime(0.01, t + 0.12);
     o.connect(g); o2.connect(g); g.connect(out);
     o.start(t); o.stop(t + 0.12); o2.start(t); o2.stop(t + 0.12);
@@ -373,14 +373,14 @@ export const playWeaponSound = (freq: number, sonic?: { body: 'crack' | 'blast' 
     o.type = 'sine';
     o.frequency.setValueAtTime(110, t);
     o.frequency.exponentialRampToValueAtTime(36, t + 0.1);
-    g.gain.setValueAtTime(0.22 * s.punch, t);
+    g.gain.setValueAtTime(0.42 * s.punch, t);
     g.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
     o.connect(g); g.connect(out); o.start(t); o.stop(t + 0.12);
   }
 
   // 4 TAIL — decaying air (length per weapon)
   if (s.tail > 0.05) {
-    noiseBurst(t + 0.02, 0.12 + 0.5 * s.tail, 0.05 * s.tail + 0.02, 'lowpass', 750, 0.6);
+    noiseBurst(t + 0.02, 0.18 + 0.7 * s.tail, 0.1 * s.tail + 0.04, 'lowpass', 750, 0.6);
   }
 
   // 5 FOLEY — the shell tink, 130ms later

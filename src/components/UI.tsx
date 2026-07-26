@@ -20,6 +20,7 @@ import { Hub } from './Hub';
 import { MapSelect } from './MapSelect';
 import { currentMap, setMapInUrl, isTower } from '../config/maps';
 import { TowerHUD } from './TowerHUD';
+import { LoadoutHUD } from './LoadoutHUD';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -88,6 +89,7 @@ export const UI = () => {
           <KillFlash />
           <BuffBadges />
           {isTower() && <TowerHUD />}
+          <LoadoutHUD />
           <ChronicleFeed />
           <ComboBadge />
           <SpellWheel />

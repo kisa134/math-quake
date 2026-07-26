@@ -55,8 +55,8 @@ export const PropVisual = ({ assetId, material, id }: { assetId: string; materia
         const hit = id ? tag({ isFloor: true, isBuilt: true, id }) : TAG_FLOOR;
         return (
           <group>
-            <mesh geometry={BOX} material={body} userData={hit} position={[0, 12, 0]} scale={[6, 24, 6]} />
-            <mesh geometry={BOX} material={material ?? MAT_WICK} userData={hit} position={[0, 26, 0]} scale={[1.2, 4, 1.2]} />
+            <mesh geometry={BOX} material={body} userData={hit} position={[0, 17, 0]} scale={[9, 34, 9]} />
+            <mesh geometry={BOX} material={material ?? MAT_WICK} userData={hit} position={[0, 37, 0]} scale={[1.8, 6, 1.8]} />
           </group>
         );
       }

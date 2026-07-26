@@ -10,6 +10,10 @@ import { accent } from '../game/accent';
 import { gunState } from '../game/gunState';
 import { useStore } from '../store';
 import { MOD_BY_ID, MOD_ANCHORS } from '../config/weaponMods';
+import { adsState } from '../game/loadout';
+
+/** Дрожь ствола сразу после выстрела (0..1) — «живое» оружие. */
+const fireShake = (): number => Math.max(0, 1 - (performance.now() - gunState.firedAt) / 150);
 
 /**
  * First-person 3D weapon viewmodel — V2.
@@ -76,8 +80,19 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       // look-lag: chase the (inverted) camera delta, spring home — mass in hands
       lagX.current += (THREE.MathUtils.clamp(-gunState.lookX * 2.2, -0.06, 0.06) - lagX.current) * Math.min(1, delta * 10);
       lagY.current += (THREE.MathUtils.clamp(-gunState.lookY * 2.2, -0.05, 0.05) - lagY.current) * Math.min(1, delta * 10);
-      g.position.set(t.pos[0] + bobX + lagX.current * 0.4, t.pos[1] + bobY + p * 0.03, t.pos[2] + p * 0.14);
-      g.rotation.set(t.rot[0] - p * 0.3 + lagY.current, t.rot[1] + lagX.current, t.rot[2] + p * 0.05 + swayRoll);
+      // ПРИЦЕЛ: ствол уезжает к центру экрана; ДРОЖЬ: трясётся при стрельбе
+      const ads = adsState.v;
+      const sh = fireShake() * 0.022;
+      g.position.set(
+        (t.pos[0] + bobX + lagX.current * 0.4) * (1 - ads) + (Math.random() - 0.5) * sh,
+        t.pos[1] + bobY + p * 0.03 + ads * 0.05 + (Math.random() - 0.5) * sh,
+        t.pos[2] + p * 0.14 - ads * 0.1,
+      );
+      g.rotation.set(
+        t.rot[0] - p * 0.3 + lagY.current + (Math.random() - 0.5) * sh * 2,
+        (t.rot[1] + lagX.current) * (1 - ads * 0.8),
+        (t.rot[2] + p * 0.05 + swayRoll) * (1 - ads * 0.9) + (Math.random() - 0.5) * sh * 2,
+      );
       g.scale.setScalar(spec.vLen * t.scale * (1 + p * 0.025)); // shot scale pulse
 
       // moving part: bolt kicks back / pump racks / minigun barrels spin
@@ -238,8 +253,18 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       // V8 Ф2.5 look-lag: the staff/dagger trails the aim with mass
       lagX.current += (THREE.MathUtils.clamp(-gunState.lookX * 2.2, -0.06, 0.06) - lagX.current) * Math.min(1, delta * 10);
       lagY.current += (THREE.MathUtils.clamp(-gunState.lookY * 2.2, -0.05, 0.05) - lagY.current) * Math.min(1, delta * 10);
-      g.position.set(t.pos[0] + bobX + px + lagX.current * 0.4, t.pos[1] + bobY + py, t.pos[2] + pz);
-      g.rotation.set(t.rot[0] + rx + lagY.current, t.rot[1] + ry + lagX.current, t.rot[2] + rz);
+      const ads = adsState.v;
+      const sh = fireShake() * 0.022;
+      g.position.set(
+        (t.pos[0] + bobX + px + lagX.current * 0.4) * (1 - ads) + (Math.random() - 0.5) * sh,
+        t.pos[1] + bobY + py + ads * 0.05 + (Math.random() - 0.5) * sh,
+        t.pos[2] + pz - ads * 0.1,
+      );
+      g.rotation.set(
+        t.rot[0] + rx + lagY.current + (Math.random() - 0.5) * sh * 2,
+        (t.rot[1] + ry + lagX.current) * (1 - ads * 0.8),
+        (t.rot[2] + rz) * (1 - ads * 0.9) + (Math.random() - 0.5) * sh * 2,
+      );
       g.scale.setScalar(t.scale * (1 + p * 0.025)); // multiplier on the vLen-normalized model + shot pulse
 
       // ── Colored glow: idle shimmer + fire flare (decays with the punch) ────
