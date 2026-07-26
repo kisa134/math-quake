@@ -6,6 +6,7 @@ import { WEAPON_PRICES, ECON } from './config/economy';
 import type { Position } from './game/market';
 import { chron } from './game/chronicle';
 import { noteTrade, noteLiq } from './game/tradingDay';
+import { loadMods, saveMods, nextMod, type WeaponModsState, type ModSocket } from './config/weaponMods';
 
 interface Enemy {
   id: string;
@@ -120,6 +121,11 @@ interface GameState {
   lastTrade: { amount: number; t: number }; // last realized PnL (HUD toast)
   setMarketWheel: (open: boolean) => void;
   setMarketLev: (lev: number) => void;
+  // V8 Ф3: the weapon constructor — blueprints persist in localStorage
+  weaponMods: WeaponModsState;
+  workbenchOpen: boolean;
+  setWorkbench: (open: boolean) => void;
+  cycleMod: (weapon: number, socket: ModSocket) => void;
   openPosition: (side: 1 | -1, entry: number) => void;
   closePosition: (exit: number) => void;
   liquidate: () => void;
@@ -218,6 +224,8 @@ export const useStore = create<GameState>((set) => ({
   position: null,
   marketWheelOpen: false,
   marketLev: 25,
+  weaponMods: loadMods(),
+  workbenchOpen: false,
   lastLiq: 0,
   lastTrade: { amount: 0, t: 0 },
   creatures: [],
@@ -399,6 +407,16 @@ export const useStore = create<GameState>((set) => ({
   setBuyMenu: (open) => set({ buyMenuOpen: open }),
   setMarketWheel: (open) => set({ marketWheelOpen: open }),
   setMarketLev: (lev) => set({ marketLev: lev }),
+  setWorkbench: (open) => set({ workbenchOpen: open }),
+  cycleMod: (weapon, socket) => set((s) => {
+    const cur = s.weaponMods[weapon]?.[socket];
+    const mods: WeaponModsState = {
+      ...s.weaponMods,
+      [weapon]: { ...s.weaponMods[weapon], [socket]: nextMod(socket, cur) },
+    };
+    saveMods(mods);
+    return { weaponMods: mods };
+  }),
   // stake = 20% of the bag (min $200), no number entry — the two-second rule
   openPosition: (side, entry) => set((s) => {
     if (s.position || s.money < 200) return s;

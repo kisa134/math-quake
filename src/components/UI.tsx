@@ -15,6 +15,7 @@ import { SpellWheel } from './SpellWheel';
 import { MarketWheel } from './MarketWheel';
 import { MarketStrip } from './MarketStrip';
 import { ClosingBell } from './ClosingBell';
+import { Workbench } from './Workbench';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -82,6 +83,7 @@ export const UI = () => {
           <MarketWheel />
           <MarketStrip />
           <ClosingBell />
+          <Workbench />
           <BuyMenu />
 
           {!editorMode && <WeaponHUD />}

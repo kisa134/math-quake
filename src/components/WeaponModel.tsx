@@ -9,6 +9,7 @@ import { buildVoxGun, type VoxGunKind } from '../game/voxGuns';
 import { accent } from '../game/accent';
 import { gunState } from '../game/gunState';
 import { useStore } from '../store';
+import { MOD_BY_ID, MOD_ANCHORS } from '../config/weaponMods';
 
 /**
  * First-person 3D weapon viewmodel — V2.
@@ -108,6 +109,11 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
     punch.current = Math.max(0, punch.current - delta * (spec.recoil > 0.5 ? 7.5 : 11));
   });
 
+  // V8 Ф3: constructor attachments — voxel blocks socketed onto the chassis
+  const mods = useStore((s) => s.weaponMods[weapon]);
+  const V = 0.045;
+  const anchors = MOD_ANCHORS[spec.voxel as VoxGunKind];
+
   return (
     <group ref={ref}>
       <mesh geometry={build.body} material={GUN_BODY_MAT} />
@@ -115,6 +121,23 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       {build.moving && (
         <mesh ref={movingRef} geometry={build.moving.geo} material={GUN_MOVE_MAT} position={build.moving.pos} />
       )}
+      {anchors && (['muzzle', 'under', 'scope'] as const).map((sock) => {
+        const id = mods?.[sock];
+        if (!id) return null;
+        const m = MOD_BY_ID[id];
+        const a = anchors[sock];
+        if (!m || !a) return null;
+        return (
+          <mesh key={sock} position={[a[0] * V, a[1] * V, a[2] * V]}>
+            <boxGeometry args={[
+              sock === 'muzzle' ? 0.09 : 0.08,
+              sock === 'scope' ? 0.07 : 0.06,
+              sock === 'muzzle' ? 0.15 : 0.09,
+            ]} />
+            <meshStandardMaterial color={m.color} emissive={m.color} emissiveIntensity={0.7} toneMapped={false} roughness={0.4} metalness={0.5} />
+          </mesh>
+        );
+      })}
       <pointLight ref={lightRef} intensity={2.2} distance={4} decay={2} position={[0, 0.06, -0.12]} />
     </group>
   );

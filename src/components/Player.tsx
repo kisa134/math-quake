@@ -8,6 +8,7 @@ import { useStore } from '../store';
 import { playShootSound, playWeaponSound, playJumpSound, playHitTick, playExplosionSound } from '../utils/audio';
 import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { noteKill } from '../game/tradingDay';
+import { modMults, SOCKETS } from '../config/weaponMods';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -158,6 +159,7 @@ export const Player = () => {
         return;
       }
       if (e.code === 'KeyP') { st.setBuyMenu(!st.buyMenuOpen); return; }        // CS buy menu
+      if (e.code === 'KeyN') { st.setWorkbench(!st.workbenchOpen); return; }    // V8 Ф3: мастерская
       if (e.code === 'KeyC') { bootsOn.current = !bootsOn.current; return; }    // magnetic boots toggle
       if (e.code === 'KeyB') { st.toggleEditor(); return; }
       if (e.code === 'KeyV') { setIsThirdPerson(prev => !prev); return; }
@@ -190,6 +192,10 @@ export const Player = () => {
         // Digits jump to an asset by index; scroll cycles (Editor.tsx owns it).
         const m = e.code.match(/^Digit([1-9])$/);
         if (m) { const i = +m[1] - 1; if (i < BUILD_IDS.length) st.setEditorSelect(BUILD_IDS[i]); }
+      } else if (st.workbenchOpen) {
+        // V8 Ф3: digits 1-4 cycle the socket's module (none → … → none)
+        const m = e.code.match(/^Digit([1-4])$/);
+        if (m) st.cycleMod(st.currentWeapon, SOCKETS[+m[1] - 1]);
       } else if (st.buyMenuOpen) {
         // Buy menu open: digits BUY (or equip if already owned).
         const m = e.code.match(/^Digit([1-9])$/);
@@ -213,7 +219,7 @@ export const Player = () => {
     const handleWheel = (e: WheelEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
-      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen) return;
+      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen || st.workbenchOpen) return;
       const n = WEAPONS.length;
       const dir = e.deltaY > 0 ? 1 : -1;
       // cycle to the next OWNED weapon (you only carry what you bought)
@@ -765,7 +771,7 @@ export const Player = () => {
     const config = WEAPONS[currentWeapon];
     const spell = getSpell(useStore.getState().selectedSpell);
     // V4 CS gunfeel: minigun heat (spin-up rate + growing cone) + spray reset
-    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen;
+    const wantsFire = !editorMode && keys.shoot && !useStore.getState().spellWheelOpen && !useStore.getState().buyMenuOpen && !useStore.getState().marketWheelOpen && !useStore.getState().workbenchOpen;
     if (config.heat) {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;
@@ -786,20 +792,24 @@ export const Player = () => {
         life: 600 + Math.random() * 300,
       }]);
     }
+    // V8 Ф3: constructor mults (rate/recoil/spread/therm from equipped mods)
+    const mm = modMults(useStore.getState().weaponMods[currentWeapon]);
     let effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
+    effRate *= mm.rate;
     if (useStore.getState().buffs.rage > Date.now()) effRate /= 1.6; // RAGE: тратата быстрее
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
       setLastShootTime(now);
       // V8 Ф1: the five-layer shot; Ф2: a hot barrel rings up to +8% sharper
       playWeaponSound(config.sound * (0.92 + Math.random() * 0.16) * (1 + gunState.therm * 0.08), config.sonic);
-      // Ф2 thermal accumulation: fast guns warm slower per shot, heavies faster
-      gunState.therm = Math.min(1, gunState.therm + (config.rate < 150 ? 0.045 : 0.13));
-      fireShot(config.recoil); // crosshair bloom + viewmodel punch
+      // Ф2 thermal accumulation (× constructor therm mult)
+      gunState.therm = Math.min(1, gunState.therm + (config.rate < 150 ? 0.045 : 0.13) * mm.therm);
+      const effRecoil = config.recoil * mm.recoil; // Ф3: compensator/stabilizer
+      fireShot(effRecoil); // crosshair bloom + viewmodel punch
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
-      recoilAmt.current = Math.min(1.2, recoilAmt.current + config.recoil);
-      addTrauma(0.03 + config.recoil * 0.12);
+      recoilAmt.current = Math.min(1.2, recoilAmt.current + effRecoil);
+      addTrauma(0.03 + effRecoil * 0.12);
       if (muzzleRef.current) {
         muzzleFade.current = 1;
         muzzleRef.current.visible = true;
@@ -991,7 +1001,7 @@ export const Player = () => {
         sprayIdx.current++;
         // V8 Ф2: an overheated barrel (therm > 0.75) blooms the cone +30%
         const thermBloom = 1 + Math.max(0, gunState.therm - 0.75) * 1.2;
-        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) * thermBloom : 0;
+        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) * thermBloom * mm.spread : 0;
 
         for (let r = 0; r < raysToFire; r++) {
           let spreadX = 0;
