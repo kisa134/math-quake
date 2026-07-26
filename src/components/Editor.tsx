@@ -21,9 +21,9 @@ const _ray = new THREE.Raycaster();
 
 const GRID = 2;                    // grid snap (units)
 const ROT_STEP = Math.PI / 2;      // 90° rotation steps
-const SCALE_MIN = 1;
-const SCALE_MAX = 2;
-const GHOST_RANGE = 14;            // where the red ghost floats when nothing is hit
+const SCALE_MIN = 0.25;            // V8.5: sandbox range — tiny…
+const SCALE_MAX = 30;              // …to гигантизм (×3-правило)
+const GHOST_RANGE = 30;            // where the red ghost floats when nothing is hit
 
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 const snapRot = (r: number) => Math.round(r / ROT_STEP) * ROT_STEP;
@@ -76,7 +76,8 @@ export const Editor = () => {
 
   useFrame(() => {
     const st = useStore.getState();
-    if (!st.editorMode) {
+    // V8.5: clicks belong to the HUB when the pointer is free — never place
+    if (!st.editorMode || !document.pointerLockElement) {
       if (ghostRef.current) ghostRef.current.visible = false;
       prevPlace.current = keys.shoot;
       prevDelete.current = keys.grapple;
@@ -84,8 +85,7 @@ export const Editor = () => {
     }
     const sel = st.editorSelect;
     const spec = getAsset(sel);
-    // Store may hold a non-buildable id (old session / avatar digit) — recover.
-    if (!spec.buildable) { st.setEditorSelect(BUILD_IDS[0]); return; }
+    // V8.5: the whole catalogue is placeable — no buildable guard anymore.
     const off = spec.prim === 'pad' ? 0.5 : 0; // legacy pad is center-origin
     const rotY = snapRot(st.editorRotY);
     const scl = Math.min(SCALE_MAX, Math.max(SCALE_MIN, st.editorScale));

@@ -9,6 +9,7 @@ import { playShootSound, playWeaponSound, playJumpSound, playHitTick, playExplos
 import { tickMarket, marketNow, isLiquidated } from '../game/market';
 import { noteKill } from '../game/tradingDay';
 import { modMults, SOCKETS } from '../config/weaponMods';
+import { adminCtx, registerTeleport } from '../game/admin';
 import { MOVE, cameraYaw, wishDirection, applyFriction, accelerate, clampHorizontal } from '../game/movement';
 import { sampleShake, addTrauma } from '../game/shake';
 import { fireHitmarker, fireShot } from '../game/fx';
@@ -120,6 +121,17 @@ export const Player = () => {
   const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
+
+  // V8.5: the admin sandbox can teleport me (портальный паттерн)
+  useEffect(() => {
+    registerTeleport((x, y, z) => {
+      const b = playerRef.current;
+      if (!b) return;
+      b.setTranslation({ x, y, z }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    });
+    return () => registerTeleport(null);
+  }, []);
   // V4.1 dragon flight
   const flightVel = useRef(new THREE.Vector3());
   const lastCannon = useRef(0);
@@ -151,6 +163,19 @@ export const Player = () => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
+      // V8.5: Tab = the clickable HUB (unlock pointer to click; re-lock in the gesture)
+      if (e.code === 'Tab') {
+        e.preventDefault();
+        if (st.hubOpen) {
+          st.setHub(false);
+          (document.querySelector('canvas') as HTMLCanvasElement | null)?.requestPointerLock();
+        } else {
+          st.setHub(true);
+          document.exitPointerLock();
+        }
+        return;
+      }
+      if (st.hubOpen) return; // hub owns the screen — game keys sleep
       if (e.code === 'KeyE') { if (!e.repeat) st.setSpellWheel(true); return; } // hold E → spell wheel
       if (e.code === 'KeyQ') {                                                  // V7 $SOUL: tap w/ position = close, hold = rose
         if (e.repeat) return;
@@ -219,7 +244,7 @@ export const Player = () => {
     const handleWheel = (e: WheelEvent) => {
       if (!isPlaying) return;
       const st = useStore.getState();
-      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen || st.workbenchOpen) return;
+      if (st.editorMode || st.spellWheelOpen || st.buyMenuOpen || st.marketWheelOpen || st.workbenchOpen || st.hubOpen) return;
       const n = WEAPONS.length;
       const dir = e.deltaY > 0 ? 1 : -1;
       // cycle to the next OWNED weapon (you only carry what you bought)
@@ -442,6 +467,11 @@ export const Player = () => {
       gunState.speed = spd;
       gunState.spread = Math.min(1, sprayIdx.current * 0.09 + heatRef.current * 0.6);
       gunState.heat = heatRef.current;
+      // V8.5: admin context — where «у меня» is for the sandbox panel
+      adminCtx.x = camera.position.x;
+      adminCtx.y = camera.position.y;
+      adminCtx.z = camera.position.z;
+      adminCtx.t = fs.clock.elapsedTime;
       // V8 Ф2.5: look-lag feed — per-frame camera rotation delta (wrapped)
       {
         const yaw = camera.rotation.y, pitch = camera.rotation.x;

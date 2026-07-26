@@ -11,6 +11,8 @@ import { tag } from '../game/hitTags';
 import { PALETTE } from '../theme';
 import { MATTE_WORLD_SOFT } from '../game/materials';
 import { updateEngine, stopEngine } from '../utils/audio';
+import { registerCarRecall } from '../game/admin';
+import { useEffect } from 'react';
 
 /**
  * V6.1 — REAL drift cars: the owner's Synty Street-Racer bodies (EXOTIC
@@ -189,6 +191,17 @@ export const Cars = () => {
   const bodies = useRef<Record<string, RapierRigidBody | null>>({});
   const lastSmoke = useRef(0);
   const wasDriving = useRef<string | null>(null);
+
+  // V8.5 admin sandbox: «тачку ко мне» — car-1 teleports to the player
+  useEffect(() => {
+    registerCarRecall((x, y, z) => {
+      const b = bodies.current['car-1'];
+      if (!b) return;
+      b.setTranslation({ x: x + 4, y: y + 2, z }, true);
+      b.setLinvel({ x: 0, y: 0, z: 0 }, true);
+    });
+    return () => registerCarRecall(null);
+  }, []);
 
   useFrame((fs, rawDelta) => {
     const delta = Math.min(rawDelta, 0.1);

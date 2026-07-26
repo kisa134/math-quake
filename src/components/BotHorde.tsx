@@ -45,8 +45,11 @@ const _groundRay = new THREE.Raycaster();
 
 // module-level so Game/Player can drive the horde without prop drilling
 let _spawn: ((count: number, round: number) => void) | null = null;
+let _adminSpawn: ((mutId: string, x: number, y: number, z: number, ambient?: boolean) => void) | null = null;
 let _aliveCount = 0;
 export function spawnBotWave(count: number, round: number) { _spawn?.(count, round); }
+/** V8.5 admin sandbox: spawn one bot of a chosen mutation at a point (host). */
+export function adminSpawnBot(mutId: string, x: number, y: number, z: number, ambient?: boolean) { _adminSpawn?.(mutId, x, y, z, ambient); }
 export function aliveBotCount() { return _aliveCount; }
 
 // V6 Ш2: орда лезет из ЖЕРЛА и с углов Торгового Пола
@@ -168,7 +171,18 @@ export const BotHorde = () => {
       bots.current.forEach((b, i) => slotOf.current.set(b.id, i));
       lastPainted.current.clear(); // repaint everyone
     };
-    return () => { _spawn = null; };
+    // V8.5 admin sandbox: one bot, chosen mutation, at a point (host only)
+    _adminSpawn = (mutId, x, y, z, ambient) => {
+      if (!useStore.getState().isHost || bots.current.length >= BOT_CAP) return;
+      const bot = makeBot(MUT_BY_ID[mutId] ?? MUTATIONS[0], x, y, z);
+      if (ambient) bot.ambient = true;
+      bots.current.push(bot);
+      ringInbox.push({ x, y: y + 0.5, z });
+      slotOf.current.clear();
+      bots.current.forEach((b, i) => slotOf.current.set(b.id, i));
+      lastPainted.current.clear();
+    };
+    return () => { _spawn = null; _adminSpawn = null; };
   }, []);
 
   const killBot = (b: Bot, slot: number) => {

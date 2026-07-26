@@ -12,8 +12,19 @@ import { hash01, epochBounds, type ConductorState } from './conductor';
 export interface FormationState { active: number; fig: number }
 const _fs: FormationState = { active: 0, fig: 0 };
 
+// V8.5 админ-режиссура: форс-формация в любую эпоху (Hub кнопки 0/1/2)
+export const formationOverride = { until: 0, fig: 0 };
+
 /** 0..1 eased window inside EUPHORIA (epoch 2), fig hashed per cycle. */
 export function formationState(t: number, cs: ConductorState): FormationState {
+  const nowMs = Date.now();
+  if (nowMs < formationOverride.until) {
+    const left = (formationOverride.until - nowMs) / 1000;
+    const w = Math.max(0, Math.min(1, Math.min(left, 2) / 2)); // ease-out tail
+    _fs.active = w * w * (3 - 2 * w);
+    _fs.fig = formationOverride.fig % 3;
+    return _fs;
+  }
   if (cs.epoch !== 2) { _fs.active = 0; return _fs; }
   const b = epochBounds(t);
   const eIn = t - b.startT;
@@ -78,7 +89,8 @@ export function formationTargetFor(fig: number, id: number, out: { x: number; y:
     out.y = 360 + u * 500;
     out.z = -380 + (hash01(id, 11) - 0.5) * 20;
   } else {
-    const u = (id - 150) / 30;
+    // clamp: ids past 180 (the titans, V8.5) stay inside the bar
+    const u = Math.min(1, (id - 150) / 30);
     out.x = 0;
     out.y = 330 + u * 560;
     out.z = -380 + (hash01(id, 11) - 0.5) * 20;

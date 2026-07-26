@@ -126,6 +126,11 @@ interface GameState {
   workbenchOpen: boolean;
   setWorkbench: (open: boolean) => void;
   cycleMod: (weapon: number, socket: ModSocket) => void;
+  // V8.5: the clickable HUB (Tab) + admin sandbox
+  hubOpen: boolean;
+  setHub: (open: boolean) => void;
+  setGod: (v: boolean) => void;
+  spawnEnemyAt: (type: Enemy['type'], x: number, y: number, z: number) => void;
   openPosition: (side: 1 | -1, entry: number) => void;
   closePosition: (exit: number) => void;
   liquidate: () => void;
@@ -226,6 +231,7 @@ export const useStore = create<GameState>((set) => ({
   marketLev: 25,
   weaponMods: loadMods(),
   workbenchOpen: false,
+  hubOpen: false,
   lastLiq: 0,
   lastTrade: { amount: 0, t: 0 },
   creatures: [],
@@ -408,6 +414,20 @@ export const useStore = create<GameState>((set) => ({
   setMarketWheel: (open) => set({ marketWheelOpen: open }),
   setMarketLev: (lev) => set({ marketLev: lev }),
   setWorkbench: (open) => set({ workbenchOpen: open }),
+  setHub: (open) => set({ hubOpen: open }),
+  setGod: (v) => set({ god: v }),
+  // V8.5 admin: place a shape anomaly exactly where asked (spawnEnemy clone)
+  spawnEnemyAt: (type, x, y, z) => set((state) => {
+    if (state.enemies.length >= 24) return state;
+    return {
+      enemies: [...state.enemies, {
+        id: Math.random().toString(36).substring(2, 9),
+        position: [x, y, z] as [number, number, number],
+        type,
+        health: type === 'candle' ? 200 : 100,
+      }],
+    };
+  }),
   cycleMod: (weapon, socket) => set((s) => {
     const cur = s.weaponMods[weapon]?.[socket];
     const mods: WeaponModsState = {

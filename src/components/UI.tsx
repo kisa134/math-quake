@@ -16,6 +16,7 @@ import { MarketWheel } from './MarketWheel';
 import { MarketStrip } from './MarketStrip';
 import { ClosingBell } from './ClosingBell';
 import { Workbench } from './Workbench';
+import { Hub } from './Hub';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -24,6 +25,7 @@ export const UI = () => {
   const rivalMax = Object.values(remotePlayers).reduce((m, p) => Math.max(m, p.money ?? 0), 0);
   const iAmTop = money >= rivalMax;
   const [locked, setLocked] = useState(false);
+  const hubOpen = useStore((s) => s.hubOpen);
 
   const weaponName = weaponNameOf(currentWeapon);
   const propName = getAsset(editorSelect).label;
@@ -139,8 +141,11 @@ export const UI = () => {
         </div>
       )}
 
+      {/* V8.5: the clickable HUB (Tab) — everything the game has, one screen */}
+      <Hub />
+
       {/* Click-to-play overlay (also re-locks after Esc — never ejects) */}
-      {isPlaying && !locked && (
+      {isPlaying && !locked && !hubOpen && (
         <div
           onClick={grabLock}
           className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-auto cursor-pointer bg-black/50 backdrop-blur-sm"
