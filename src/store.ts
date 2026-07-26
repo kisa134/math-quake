@@ -6,6 +6,7 @@ import { WEAPON_PRICES, ECON } from './config/economy';
 import type { Position } from './game/market';
 import { chron } from './game/chronicle';
 import { noteTrade, noteLiq } from './game/tradingDay';
+import { insertEcho } from './net/echoes';
 import { loadMods, saveMods, nextMod, type WeaponModsState, type ModSocket } from './config/weaponMods';
 
 interface Enemy {
@@ -465,6 +466,9 @@ export const useStore = create<GameState>((set) => ({
     addTrauma(0.5);
     noteLiq(s.position.stake);
     chron(`† МАРЖИН-КОЛЛ: −$${s.position.stake}`);
+    // V8.6 W4: financial death (liquidated on an empty bag) births an ECHO —
+    // your name and the position you burned on join the horde for the next ones
+    if (s.money < 100) insertEcho(s.roomId || 'arena', Math.min(1000000, s.position.stake * s.position.lev), 'liq');
     return {
       position: null,
       lastLiq: Date.now(),

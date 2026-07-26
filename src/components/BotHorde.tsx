@@ -1,4 +1,4 @@
-import { useMemo, useRef, useLayoutEffect } from 'react';
+import { useMemo, useRef, useLayoutEffect, useEffect } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useStore } from '../store';
@@ -18,6 +18,7 @@ import { conductorState, hash01 } from '../game/conductor';
 import { tryPortal } from '../game/portals';
 import { ROAD_DECK, ROAD_DECK_TOP } from '../config/trackSpline';
 import { worldT } from '../game/worldClock';
+import { fetchEchoes, type Echo } from '../net/echoes';
 
 /**
  * V4 БРУТАЛ — the voxel-dude BOT HORDE. Up to 40 mutated white-dude bots in
@@ -58,6 +59,34 @@ const SPAWN_ANCHORS: [number, number, number][] = [
   [0, 86, 0], [0, 86, 0], [0, 86, 0], // Жерло — главный поток
   [100, 86, 100], [-100, 86, 100], [100, 86, -100], [-100, 86, -100],
 ];
+
+// V8.6 W4 — the ECHO pool: dead players who march back with the waves.
+let echoPool: Echo[] = [];
+let echoCursor = 0;
+let waveCounter = 0;
+/** Echo mutation ladder by burned bag (WOLF_ARC §7.4). */
+function echoMut(bag: number): string {
+  if (bag < 5000) return 'BONE';
+  if (bag < 20000) return 'GOLDBOY';
+  return 'GIANT';
+}
+/** Nameplate texture («Kisa · $84200») — canvas, XSS-proof by construction. */
+function makePlate(name: string, bag: number): THREE.CanvasTexture {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 64;
+  const ctx = cv.getContext('2d')!;
+  ctx.clearRect(0, 0, 256, 64);
+  ctx.textAlign = 'center';
+  ctx.font = '900 26px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(name.slice(0, 12), 128, 26);
+  ctx.font = '700 20px monospace';
+  ctx.fillStyle = '#e9c46a';
+  ctx.fillText('$' + bag.toLocaleString('en-US'), 128, 52);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 // V7.5 Ц2 — АМБИЕНТ-СЛОЙ: мир живёт и без раундов. Три сцены жизни.
 const AMBIENT_TARGET = 14;
@@ -141,6 +170,19 @@ export const BotHorde = () => {
   const lastSync = useRef(0);
   const archonEpoch = useRef(-1); // V5 C7: one Archon per scheduled capitulation
   const lastAmbient = useRef(0);  // V7.5 Ц2: ambient upkeep throttle
+  // V8.6 W4: echo nameplates (≤2 canvas sprites)
+  const plateRefs = useRef<Array<THREE.Sprite | null>>([null, null]);
+  const plateNames = useRef<[string, string]>(['', '']);
+  const plateMats = useMemo(() => [
+    new THREE.SpriteMaterial({ transparent: true, depthWrite: false }),
+    new THREE.SpriteMaterial({ transparent: true, depthWrite: false }),
+  ], []);
+
+  // V8.6 W4: host pulls the echo pool once — the room's fresh dead + the hall of greed
+  useEffect(() => {
+    if (!useStore.getState().isHost) return;
+    void fetchEchoes(useStore.getState().roomId || 'arena').then((list) => { echoPool = list; });
+  }, []);
 
   useLayoutEffect(() => {
     for (const m of [headRef.current, torsoRef.current, armsRef.current, legsRef.current]) {
@@ -157,12 +199,26 @@ export const BotHorde = () => {
   useLayoutEffect(() => {
     _spawn = (count, round) => {
       const withDevourer = round % 3 === 0;
+      // V8.6 W4: every 2nd wave marches a dead player's ECHO in slot 1
+      waveCounter++;
+      const echo = waveCounter % 2 === 0 && echoPool.length
+        ? echoPool[echoCursor++ % echoPool.length] : null;
       for (let n = 0; n < count && bots.current.length < BOT_CAP; n++) {
-        const mut = withDevourer && n === 0 ? MUT_BY_ID['DEVOURER'] : rollMutation(Math.random);
+        const isEcho = !!echo && n === (withDevourer ? 1 : 0);
+        const mut = withDevourer && n === 0 ? MUT_BY_ID['DEVOURER']
+          : isEcho ? MUT_BY_ID[echoMut(echo!.bag)]
+          : rollMutation(Math.random);
         const anchor = SPAWN_ANCHORS[Math.floor(Math.random() * SPAWN_ANCHORS.length)];
         const a = Math.random() * Math.PI * 2;
         const r = 8 + Math.random() * 22;
         const bot = makeBot(mut, anchor[0] + Math.cos(a) * r, anchor[1] + 4, anchor[2] + Math.sin(a) * r);
+        if (isEcho && echo) {
+          bot.echoName = echo.name;
+          bot.echoBag = echo.bag;
+          bot.scale = mut.scale * Math.min(2, 1 + Math.log10(Math.max(10, echo.bag)) / 8);
+          bot.hp = Math.min(800, mut.hp + echo.bag / 100);
+          chron(`⟳ ЭХО ${echo.name} вернулось с ордой`);
+        }
         bots.current.push(bot);
         // V6 Ш5 спавн-театр: каждое явление отмечено кольцом (жерло дышит)
         ringInbox.push({ x: bot.x, y: bot.y + 0.5, z: bot.z });
@@ -204,8 +260,11 @@ export const BotHorde = () => {
     ringInbox.push({ x: b.x, y: b.y + 0.5, z: b.z });
     // dopamine: 22% chance the corpse drops a buff orb (personal loot)
     if (Math.random() < 0.22) orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z });
-    // chronicle: the world narrates its violence (ambient deaths mostly silent)
-    if (!b.ambient || Math.random() < 0.3)
+    // V8.6 W4: laying an echo to rest pays 1% of its bag
+    if (b.echoName) {
+      orbSpawnInbox.push({ x: b.x, y: b.y + 1, z: b.z, kind: 'cash' });
+      chron(`⟲ Эхо ${b.echoName} упокоено`);
+    } else if (!b.ambient || Math.random() < 0.3)
       chron(b.mut === 'ARCHON' ? '☠ МЕДВЕДЬ-АРХОНТ ПАЛ' : b.mut === 'DEVOURER' ? '☠ ПОЖИРАТЕЛЬ насытился навсегда' : `${b.mut} разлетелся вокселями`);
     socket.emit('botdead', { x: b.x, y: b.y + b.scale, z: b.z, big: b.mut === 'DEVOURER' });
     bots.current = bots.current.filter((o) => o.id !== b.id);
@@ -469,6 +528,7 @@ export const BotHorde = () => {
             h: Math.round(b.heading * 100) / 100, lm: b.limbMask, hp: b.hp,
             s: Math.round(b.scale * 100) / 100,
             ...(b.ambient ? { a: 1 as const } : {}),
+            ...(b.echoName ? { n: b.echoName, b: b.echoBag ?? 0 } : {}),
           })),
         });
       }
@@ -514,6 +574,32 @@ export const BotHorde = () => {
       netSmooth.current.forEach((_, id) => { if (!seen.has(id)) netSmooth.current.delete(id); });
     }
 
+    // V8.6 W4: float the echo nameplates over their bots (host truth or mirror)
+    {
+      let pi = 0;
+      const put = (x: number, y: number, z: number, scale: number, name: string, bag: number) => {
+        if (pi >= 2) return;
+        const s = plateRefs.current[pi];
+        if (!s) { pi++; return; }
+        s.visible = true;
+        s.position.set(x, y + scale * 2.6 + 1.2, z);
+        if (plateNames.current[pi] !== name) {
+          plateNames.current[pi] = name;
+          const old = plateMats[pi].map;
+          plateMats[pi].map = makePlate(name, bag);
+          plateMats[pi].needsUpdate = true;
+          old?.dispose();
+        }
+        pi++;
+      };
+      if (isHost) {
+        for (const b of bots.current) if (b.echoName) put(b.x, b.y, b.z, b.scale, b.echoName, b.echoBag ?? 0);
+      } else {
+        for (const nb of netBots.list) if (nb.n) put(nb.x, nb.y, nb.z, nb.s, nb.n, nb.b ?? 0);
+      }
+      for (; pi < 2; pi++) { const s = plateRefs.current[pi]; if (s) s.visible = false; }
+    }
+
     head.instanceMatrix.needsUpdate = true;
     torso.instanceMatrix.needsUpdate = true;
     arms.instanceMatrix.needsUpdate = true;
@@ -534,6 +620,10 @@ export const BotHorde = () => {
       <instancedMesh ref={legsRef} args={[parts.leg, undefined, BOT_CAP * 2]}>
         <meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.12} roughness={0.55} metalness={0.05} />
       </instancedMesh>
+      {/* V8.6 W4: two echo nameplates (canvas sprites, XSS-proof) */}
+      {[0, 1].map((i) => (
+        <sprite key={'plate' + i} ref={(s) => { plateRefs.current[i] = s; }} visible={false} scale={[10, 2.5, 1]} material={plateMats[i]} />
+      ))}
       {/* invisible hit proxies — the only raycast targets for the horde */}
       {Array.from({ length: BOT_CAP }, (_, i) => (
         <mesh

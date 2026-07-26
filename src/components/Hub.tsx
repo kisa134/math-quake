@@ -16,6 +16,7 @@ import { getCity } from '../game/cityscape';
 import { DRAGONS } from '../game/voxDragon';
 import { playSuction, playHitTick } from '../utils/audio';
 import { gunState } from '../game/gunState';
+import { echoName, setEchoName } from '../net/echoes';
 
 /**
  * V8.5 П1 — THE HUB (Tab). Максимум песочницы на одном КЛИКАБЕЛЬНОМ экране:
@@ -158,6 +159,18 @@ export const Hub = () => {
               ))}
               <div className={btn} onClick={() => st().addMoney(100000)}>+$100K</div>
               <div className={btn} onClick={() => { gunState.therm = 0; }}>ОСТУДИТЬ СТВОЛ</div>
+            </div>
+            {/* V8.6 W4: имя для твоего ЭХА — под ним ты вернёшься в орду */}
+            <div className="flex items-center gap-2 mt-2">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-white/40">Имя эха:</span>
+              <input
+                className="bg-black/60 border border-white/25 px-2 py-1 font-mono text-[12px] text-white w-44 outline-none focus:border-amber-300"
+                defaultValue={echoName()}
+                maxLength={16}
+                placeholder="как тебя запомнят"
+                onChange={(e) => setEchoName(e.target.value)}
+              />
+              <span className="font-mono text-[10px] text-white/30">умрёшь ликвидированным — вернёшься с ордой</span>
             </div>
           </Section>
 

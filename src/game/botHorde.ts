@@ -56,6 +56,9 @@ export interface Bot {
   nextMeleeAt?: number;
   wpSeg?: number;       // waypoint schedule segment
   wpX?: number; wpZ?: number;
+  // V8.6 W4: this bot is a dead player's ECHO — name + bag shown on a plate
+  echoName?: string;
+  echoBag?: number;
 }
 
 export const BOT_CAP = 64;
@@ -103,5 +106,7 @@ export interface NetBot {
   id: number; mut: string; x: number; y: number; z: number;
   h: number; lm: number; hp: number; s: number;
   a?: 1; // ambient flag (peers exclude from the round-win count)
+  n?: string; // V8.6 W4: echo nameplate («Kisa · $84200»)
+  b?: number; // echo bag
 }
 export const netBots: { list: NetBot[] } = { list: [] };
