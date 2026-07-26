@@ -72,6 +72,7 @@ export const Hub = () => {
   const placedCount = useStore((s) => s.placedProps.length);
   const isHost = useStore((s) => s.isHost);
   const money = useStore((s) => s.money);
+  const lite = useStore((s) => s.lite);
 
   if (!open) return null;
   const st = () => useStore.getState();
@@ -149,6 +150,10 @@ export const Hub = () => {
           {/* МИР */}
           <Section title="Мир — ручки (локально)">
             <div className="flex flex-wrap gap-1">
+              <div className={lite ? btnOn : btn} style={{ borderColor: '#ff7b00' }}
+                   onClick={() => st().setLite(!lite)}>
+                ⚡ LITE-РЕЖИМ {lite ? 'ON' : 'OFF'} (если лагает — жми!)
+              </div>
               <div className={god ? btnOn : btn} onClick={() => st().setGod(!god)}>GOD {god ? 'ON' : 'OFF'}</div>
               <div className={isJetInfinite() ? btnOn : btn} onClick={() => { setJetInfinite(!isJetInfinite()); st().setHub(true); }}>ДЖЕТ ∞ {isJetInfinite() ? 'ON' : 'OFF'}</div>
               {[1, 2, 3].map((m) => (

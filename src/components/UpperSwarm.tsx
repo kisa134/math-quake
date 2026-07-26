@@ -14,7 +14,7 @@ import { worldT } from '../game/worldClock';
  */
 const NO_RAYCAST = () => {};
 const DUMMY = new THREE.Object3D();
-const N = 240;
+const N = 120; // V8.6 perf diet (was 240)
 
 const mulberry = (seed: number) => {
   let a = seed >>> 0;

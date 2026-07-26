@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { EffectComposer, Bloom, Vignette, SMAA, HueSaturation, BrightnessContrast, ChromaticAberration } from '@react-three/postprocessing';
+import { EffectComposer, Bloom, Vignette, HueSaturation, BrightnessContrast, ChromaticAberration } from '@react-three/postprocessing';
 import { BlendFunction } from 'postprocessing';
 import { blackHoleSuck } from './VoxelCandles';
 
@@ -37,12 +37,13 @@ export const PostFX = () => {
         mipmapBlur
         radius={0.7}
       />
-      {/* V5 minimal grade: calmer saturation, thinner vignette — gallery light */}
+      {/* V5 minimal grade: calmer saturation, thinner vignette — gallery light.
+          V8.6 perf: SMAA pass dropped (дорогой проход на слабом GPU); CA
+          остаётся — единственный носитель кино-воронки. */}
       <HueSaturation saturation={0.06} />
       <BrightnessContrast brightness={-0.01} contrast={0.07} />
       <ChromaticAberration ref={caRef} blendFunction={BlendFunction.NORMAL} offset={new THREE.Vector2(0.0006, 0.0006)} radialModulation={false} modulationOffset={0} />
       <Vignette ref={vigRef} offset={0.22} darkness={0.78} />
-      <SMAA />
     </EffectComposer>
   );
 };

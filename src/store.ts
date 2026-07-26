@@ -130,6 +130,9 @@ interface GameState {
   // V8.5: the clickable HUB (Tab) + admin sandbox
   hubOpen: boolean;
   setHub: (open: boolean) => void;
+  // V8.6 PERF: LITE mode — гарантированно играбельно на слабом GPU
+  lite: boolean;
+  setLite: (v: boolean) => void;
   setGod: (v: boolean) => void;
   spawnEnemyAt: (type: Enemy['type'], x: number, y: number, z: number) => void;
   openPosition: (side: 1 | -1, entry: number) => void;
@@ -233,6 +236,7 @@ export const useStore = create<GameState>((set) => ({
   weaponMods: loadMods(),
   workbenchOpen: false,
   hubOpen: false,
+  lite: (() => { try { return localStorage.getItem('mq-lite') === '1'; } catch { return false; } })(),
   lastLiq: 0,
   lastTrade: { amount: 0, t: 0 },
   creatures: [],
@@ -416,6 +420,10 @@ export const useStore = create<GameState>((set) => ({
   setMarketLev: (lev) => set({ marketLev: lev }),
   setWorkbench: (open) => set({ workbenchOpen: open }),
   setHub: (open) => set({ hubOpen: open }),
+  setLite: (v) => {
+    try { localStorage.setItem('mq-lite', v ? '1' : '0'); } catch { /* ok */ }
+    set({ lite: v });
+  },
   setGod: (v) => set({ god: v }),
   // V8.5 admin: place a shape anomaly exactly where asked (spawnEnemy clone)
   spawnEnemyAt: (type, x, y, z) => set((state) => {

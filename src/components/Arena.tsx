@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { MatrixRain } from './MatrixRain';
 import { PALETTE } from '../theme';
 import { MATTE_WORLD, MATTE_WORLD_SOFT } from '../game/materials';
+import { useStore } from '../store';
 
 
 const NO_RAYCAST = () => {};
@@ -13,6 +14,7 @@ export const Arena = () => {
   // Sky/backdrop layer (rain shell, 10k star points, infinite grid) must NEVER
   // be raycast — the per-frame ground-probe and projectile rays were paying a
   // 10k-point sphere test on Stars alone. Visual only.
+  const lite = useStore((s) => s.lite); // V8.6 PERF: matrix shells are pure fillrate
   const skyRef = React.useRef<THREE.Group>(null);
   React.useEffect(() => {
     skyRef.current?.traverse((o) => { o.raycast = NO_RAYCAST; });
@@ -21,7 +23,7 @@ export const Arena = () => {
   return (
     <group>
       <group ref={skyRef}>
-        <MatrixRain />
+        {!lite && <MatrixRain />}
         <Stars radius={300} depth={100} count={10000} factor={4} saturation={1} fade speed={1.5} />
         <Grid infiniteGrid fadeDistance={2000} cellColor={PALETTE.gridCell} sectionColor={PALETTE.gridSect} position={[0, -49, 0]} />
       </group>
