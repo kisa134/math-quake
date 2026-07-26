@@ -8,6 +8,7 @@ import { onFire } from '../game/fx';
 import { buildVoxGun, type VoxGunKind } from '../game/voxGuns';
 import { accent } from '../game/accent';
 import { gunState } from '../game/gunState';
+import { useStore } from '../store';
 
 /**
  * First-person 3D weapon viewmodel — V2.
@@ -40,7 +41,10 @@ const GUN_GLOW_MAT = new THREE.MeshStandardMaterial({
 });
 const GUN_MOVE_MAT = new THREE.MeshStandardMaterial({
   color: '#1b1918', roughness: 0.45, metalness: 0.7,
+  emissive: '#ff2d10', emissiveIntensity: 0, // V8 Ф2: glows red-hot with therm
 });
+const RAGE_TINT = new THREE.Color('#ff5714');
+const _glowC = new THREE.Color();
 
 const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
   const build = useMemo(() => buildVoxGun(spec.voxel as VoxGunKind), [spec.voxel]);
@@ -80,8 +84,15 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
           mv.rotation.z = spin.current;
         }
       }
-      GUN_GLOW_MAT.color.copy(accent);
-      GUN_GLOW_MAT.emissive.copy(accent);
+      // V8 Ф2 thermal states: glow brightens warm, the moving part goes RED-HOT
+      // past 50% therm; RAGE buff tints the whole glow fire-orange.
+      const therm = gunState.therm;
+      _glowC.copy(accent);
+      if (useStore.getState().buffs.rage > Date.now()) _glowC.lerp(RAGE_TINT, 0.65);
+      GUN_GLOW_MAT.color.copy(_glowC);
+      GUN_GLOW_MAT.emissive.copy(_glowC);
+      GUN_GLOW_MAT.emissiveIntensity = 1.4 + therm * 1.3;
+      GUN_MOVE_MAT.emissiveIntensity = Math.max(0, therm - 0.5) * 2 * 0.9;
       const light = lightRef.current;
       if (light) {
         light.color.copy(accent);

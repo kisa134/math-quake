@@ -116,6 +116,7 @@ export const Player = () => {
   // V4 CS gunfeel: spray index + minigun heat
   const sprayIdx = useRef(0);
   const heatRef = useRef(0);
+  const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
   // V4.1 dragon flight
   const flightVel = useRef(new THREE.Vector3());
   const lastCannon = useRef(0);
@@ -759,13 +760,31 @@ export const Player = () => {
       heatRef.current = Math.min(1, Math.max(0, heatRef.current + (wantsFire ? 2.2 : -1.8) * delta));
     } else if (heatRef.current > 0) heatRef.current = 0;
     if (now - lastShootTime > 260) sprayIdx.current = 0; // let go → pattern resets
+    // V8 Ф2: per-weapon thermal state — cools in idle, resets on weapon swap
+    if (prevWeaponRef.current !== currentWeapon) { prevWeaponRef.current = currentWeapon; gunState.therm = 0; }
+    gunState.therm = Math.max(0, gunState.therm - delta * 0.3);
+    // overheated barrel vents smoke wisps at the muzzle
+    if (gunState.therm > 0.8 && Math.random() < delta * 6) {
+      camera.getWorldDirection(_recoilVec);
+      useStore.getState().addDebris([{
+        x: camera.position.x + _recoilVec.x * 1.1,
+        y: camera.position.y - 0.12,
+        z: camera.position.z + _recoilVec.z * 1.1,
+        vx: (Math.random() - 0.5) * 0.5, vy: 1.1 + Math.random() * 0.7, vz: (Math.random() - 0.5) * 0.5,
+        color: '#8d8a84', size: 0.06 + Math.random() * 0.05,
+        rx: Math.random() * 3, ry: Math.random() * 3, rz: Math.random() * 3,
+        life: 600 + Math.random() * 300,
+      }]);
+    }
     let effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
     if (useStore.getState().buffs.rage > Date.now()) effRate /= 1.6; // RAGE: тратата быстрее
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
       setLastShootTime(now);
-      // V8 Ф1: the five-layer shot (mech/body/punch/tail/foley), ±8% pitch wobble
-      playWeaponSound(config.sound * (0.92 + Math.random() * 0.16), config.sonic);
+      // V8 Ф1: the five-layer shot; Ф2: a hot barrel rings up to +8% sharper
+      playWeaponSound(config.sound * (0.92 + Math.random() * 0.16) * (1 + gunState.therm * 0.08), config.sonic);
+      // Ф2 thermal accumulation: fast guns warm slower per shot, heavies faster
+      gunState.therm = Math.min(1, gunState.therm + (config.rate < 150 ? 0.045 : 0.13));
       fireShot(config.recoil); // crosshair bloom + viewmodel punch
 
       // --- weapon feel: recoil kick + muzzle flash + fire shake ---
@@ -960,7 +979,9 @@ export const Player = () => {
           ? config.spray[Math.min(sprayIdx.current, config.spray.length - 1)]
           : null;
         sprayIdx.current++;
-        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) : 0;
+        // V8 Ф2: an overheated barrel (therm > 0.75) blooms the cone +30%
+        const thermBloom = 1 + Math.max(0, gunState.therm - 0.75) * 1.2;
+        const effSpread = config.spread ? config.spread * (config.heat ? 0.35 + heatRef.current : 1) * thermBloom : 0;
 
         for (let r = 0; r < raysToFire; r++) {
           let spreadX = 0;
