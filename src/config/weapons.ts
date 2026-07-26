@@ -69,7 +69,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'SCATTER SHOT', rate: 800, damage: 10, recoil: 0.4, sound: 200,
     spread: 0.1, rays: 8, tracer: 0xffb703, muzzle: '#ffd27a', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.78, mScale: 1, voxel: 'shotgun',
-    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
+    mPos: [0.29, -0.31, -0.5], mRot: [0.02, 0, 0] }, // V8: вокс смотрит вперёд — FBX-доворот убран
 
   // 3 — PLASMA STAFF: projectile caster, magenta. The workhorse bolt-thrower.
   { name: 'PLASMA STAFF', rate: 400, damage: 40, recoil: 0.2, sound: 400,
@@ -95,7 +95,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'KALASH GLITCH', rate: 105, damage: 30, recoil: 0.16, sound: 300,
     tracer: 0xff7b00, muzzle: '#ffc999', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.82, mScale: 1, voxel: 'ak',
-    mPos: [0.28, -0.3, -0.52], mRot: [0, -1.5, 0],
+    mPos: [0.28, -0.3, -0.52], mRot: [0.02, 0, 0],
     spray: [[0, 0], [0, 0], [0, 0.006], [0.002, 0.014], [-0.003, 0.023],
       [0.006, 0.031], [-0.008, 0.037], [0.011, 0.041], [-0.012, 0.044],
       [0.013, 0.046], [-0.013, 0.047], [0.014, 0.048]] },
@@ -105,14 +105,14 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'SALARY SHREDDER', rate: 55, damage: 9, recoil: 0.07, sound: 240,
     spread: 0.055, tracer: 0xffd166, muzzle: '#ffe9b0', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.95, mScale: 1, voxel: 'minigun',
-    mPos: [0.3, -0.36, -0.56], mRot: [0, -1.5, 0.05],
+    mPos: [0.3, -0.36, -0.56], mRot: [0.02, 0, 0.02],
     heat: true, slow: 0.6 },
 
   // 8 — MARGIN CALL: the deagle. One golden answer per question.
   { name: 'MARGIN CALL', rate: 320, damage: 62, recoil: 0.34, sound: 150,
     tracer: 0xe9c46a, muzzle: '#fff1c0', anim: 'slash',
     model: 'weapons/dagger_01.fbx', vLen: 0.42, mScale: 1, voxel: 'deagle',
-    mPos: [0.27, -0.32, -0.46], mRot: [0.3, 0.12, 0.08],
+    mPos: [0.27, -0.32, -0.46], mRot: [0.06, 0.03, 0.02],
     spray: [[0, 0], [0.004, 0.02], [-0.006, 0.034], [0.008, 0.042]] },
 
   // 9 — PORTAL RIG: как в Portal. ЛКМ ставит порталы поочерёдно (синий A /
@@ -120,7 +120,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'PORTAL RIG', rate: 350, damage: 0, recoil: 0.12, sound: 620,
     tracer: 0x00b4d8, muzzle: '#9ee8ff', anim: 'thrust', portal: true,
     model: 'weapons/wand_01.fbx', vLen: 0.55, mScale: 1, voxel: 'deagle',
-    mPos: [0.27, -0.32, -0.46], mRot: [0.2, 0.1, 0] },
+    mPos: [0.27, -0.32, -0.46], mRot: [0.06, 0.03, 0] },
 
   // ── V7.5 ЦИРК: the second rack (slots 10-16, wheel-only past 9) ────────────
   // 10 — BEAR TRAP: двустволка. One break-action wall of death, then you break
@@ -128,7 +128,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'BEAR TRAP', rate: 1150, damage: 9, recoil: 0.8, sound: 130,
     spread: 0.13, rays: 16, tracer: 0xff5714, muzzle: '#ffb499', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.85, mScale: 1, voxel: 'db',
-    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
+    mPos: [0.29, -0.31, -0.5], mRot: [0.02, 0, 0] },
 
   // 11 — HFT STITCHER: high-frequency trading в форме ствола. Быстрее кинжала;
   // спрей — длинная мелкая змейка, шьёт как швейная машинка.
@@ -145,7 +145,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'FED PRINTER', rate: 150, damage: 20, recoil: 0.1, sound: 500,
     type: 'projectile', tracer: 0x2fbf71, muzzle: '#b7f7d4', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.7, mScale: 1, voxel: 'printer',
-    mPos: [0.29, -0.33, -0.52], mRot: [0, -1.5, 0] },
+    mPos: [0.29, -0.33, -0.52], mRot: [0.02, 0, 0] },
 
   // 13 — WHALE HARPOON: нюк-копьё на китов. Медленно, толсто, окончательно.
   { name: 'WHALE HARPOON', rate: 1000, damage: 170, recoil: 0.7, sound: 90,
@@ -165,7 +165,7 @@ export const WEAPONS: WeaponSpec[] = [
   { name: 'LIQUIDATOR', rate: 340, damage: 8, recoil: 0.3, sound: 210,
     spread: 0.08, rays: 6, tracer: 0xffa62b, muzzle: '#ffd9a0', anim: 'pump',
     model: 'weapons/SM_Wep_Shotgun_01.fbx', vLen: 0.8, mScale: 1, voxel: 'shotgun',
-    mPos: [0.29, -0.31, -0.5], mRot: [0, -1.5, 0] },
+    mPos: [0.29, -0.31, -0.5], mRot: [0.02, 0, 0] },
 
   // 16 — BLACK SWAN: судный день. Один белый выстрел раз в две секунды —
   // и что угодно перестаёт существовать. Никто его не предсказывает.

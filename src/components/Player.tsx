@@ -117,6 +117,8 @@ export const Player = () => {
   const sprayIdx = useRef(0);
   const heatRef = useRef(0);
   const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
+  const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
+  const prevPitchRef = useRef(0);
   // V4.1 dragon flight
   const flightVel = useRef(new THREE.Vector3());
   const lastCannon = useRef(0);
@@ -434,6 +436,14 @@ export const Player = () => {
       gunState.speed = spd;
       gunState.spread = Math.min(1, sprayIdx.current * 0.09 + heatRef.current * 0.6);
       gunState.heat = heatRef.current;
+      // V8 Ф2.5: look-lag feed — per-frame camera rotation delta (wrapped)
+      {
+        const yaw = camera.rotation.y, pitch = camera.rotation.x;
+        gunState.lookX = Math.atan2(Math.sin(yaw - prevYawRef.current), Math.cos(yaw - prevYawRef.current));
+        gunState.lookY = pitch - prevPitchRef.current;
+        prevYawRef.current = yaw;
+        prevPitchRef.current = pitch;
+      }
       const speedFov = Math.min(11, Math.max(0, (spd - 26) * 0.18));
       const target = 80 + recoilAmt.current * 5 + speedFov;
       smoothFov.current += (target - smoothFov.current) * Math.min(1, delta * 7);

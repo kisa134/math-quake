@@ -54,6 +54,8 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
   const punch = useRef(0);
   const clock = useRef(0);
   const spin = useRef(0);
+  const lagX = useRef(0); // V8 Ф2.5: the gun trails the aim
+  const lagY = useRef(0);
 
   useEffect(() => onFire((recoil) => { punch.current = Math.min(1.4, punch.current + recoil); }), []);
 
@@ -70,9 +72,12 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       const bobY = Math.sin(clock.current * swayF) * 0.006 * (1 + spd01 * 2.2);
       const bobX = Math.cos(clock.current * swayF * 0.7) * 0.004 * (1 + spd01 * 2.6);
       const swayRoll = Math.sin(clock.current * swayF * 0.5) * 0.02 * spd01;
-      g.position.set(t.pos[0] + bobX, t.pos[1] + bobY + p * 0.03, t.pos[2] + p * 0.14);
-      g.rotation.set(t.rot[0] - p * 0.3, t.rot[1], t.rot[2] + p * 0.05 + swayRoll);
-      g.scale.setScalar(spec.vLen * t.scale);
+      // look-lag: chase the (inverted) camera delta, spring home — mass in hands
+      lagX.current += (THREE.MathUtils.clamp(-gunState.lookX * 2.2, -0.06, 0.06) - lagX.current) * Math.min(1, delta * 10);
+      lagY.current += (THREE.MathUtils.clamp(-gunState.lookY * 2.2, -0.05, 0.05) - lagY.current) * Math.min(1, delta * 10);
+      g.position.set(t.pos[0] + bobX + lagX.current * 0.4, t.pos[1] + bobY + p * 0.03, t.pos[2] + p * 0.14);
+      g.rotation.set(t.rot[0] - p * 0.3 + lagY.current, t.rot[1] + lagX.current, t.rot[2] + p * 0.05 + swayRoll);
+      g.scale.setScalar(spec.vLen * t.scale * (1 + p * 0.025)); // shot scale pulse
 
       // moving part: bolt kicks back / pump racks / minigun barrels spin
       const mv = movingRef.current;
@@ -91,7 +96,7 @@ const VoxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
       if (useStore.getState().buffs.rage > Date.now()) _glowC.lerp(RAGE_TINT, 0.65);
       GUN_GLOW_MAT.color.copy(_glowC);
       GUN_GLOW_MAT.emissive.copy(_glowC);
-      GUN_GLOW_MAT.emissiveIntensity = 1.4 + therm * 1.3;
+      GUN_GLOW_MAT.emissiveIntensity = 1.4 + therm * 1.3 + p * 1.2; // flash on shot
       GUN_MOVE_MAT.emissiveIntensity = Math.max(0, therm - 0.5) * 2 * 0.9;
       const light = lightRef.current;
       if (light) {
@@ -159,6 +164,8 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
   const lightRef = useRef<THREE.PointLight>(null);
   const punch = useRef(0);
   const clock = useRef(0);
+  const lagX = useRef(0); // V8 Ф2.5: look-lag
+  const lagY = useRef(0);
 
   useEffect(() => onFire((recoil) => { punch.current = Math.min(1.4, punch.current + recoil); }), []);
 
@@ -205,9 +212,12 @@ const FbxWeapon = ({ weapon, spec }: { weapon: number; spec: WeaponSpec }) => {
           break;
       }
 
-      g.position.set(t.pos[0] + bobX + px, t.pos[1] + bobY + py, t.pos[2] + pz);
-      g.rotation.set(t.rot[0] + rx, t.rot[1] + ry, t.rot[2] + rz);
-      g.scale.setScalar(t.scale); // multiplier on the vLen-normalized model
+      // V8 Ф2.5 look-lag: the staff/dagger trails the aim with mass
+      lagX.current += (THREE.MathUtils.clamp(-gunState.lookX * 2.2, -0.06, 0.06) - lagX.current) * Math.min(1, delta * 10);
+      lagY.current += (THREE.MathUtils.clamp(-gunState.lookY * 2.2, -0.05, 0.05) - lagY.current) * Math.min(1, delta * 10);
+      g.position.set(t.pos[0] + bobX + px + lagX.current * 0.4, t.pos[1] + bobY + py, t.pos[2] + pz);
+      g.rotation.set(t.rot[0] + rx + lagY.current, t.rot[1] + ry + lagX.current, t.rot[2] + rz);
+      g.scale.setScalar(t.scale * (1 + p * 0.025)); // multiplier on the vLen-normalized model + shot pulse
 
       // ── Colored glow: idle shimmer + fire flare (decays with the punch) ────
       const light = lightRef.current;
