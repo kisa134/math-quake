@@ -10,6 +10,8 @@
  * Colors drive the juice pass: tracer + muzzle + a colored point light glow on
  * the viewmodel itself. `anim` picks the procedural fire animation class.
  */
+import { isTower } from './maps';
+
 export type WeaponAnim = 'slash' | 'pump' | 'thrust' | 'swing';
 
 // V8 Ф1 — the living weapon layers (docs/V8_VISION.md §6-7):
@@ -216,5 +218,14 @@ const SHELLS: WeaponShell[] = [
   { size: 0.07, color: '#ffffff', count: 3 },        // swan — white FEATHERS
 ];
 WEAPONS.forEach((w, i) => { w.sonic = SONICS[i]; w.shell = SHELLS[i]; });
+
+// МАТЕМАТИЧЕСКАЯ БАШНЯ: оружие крупнее и злее — свечи должны РАЗЛЕТАТЬСЯ
+if (isTower()) {
+  WEAPONS.forEach((w) => {
+    w.damage = Math.round(w.damage * 2.4);
+    w.vLen *= 1.32;                 // ствол в кадре заметно больше
+    w.recoil = Math.min(1.2, w.recoil * 1.25);
+  });
+}
 
 export const weaponName = (i: number): string => WEAPONS[i]?.name ?? 'UNKNOWN';

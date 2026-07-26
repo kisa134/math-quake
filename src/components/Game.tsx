@@ -47,7 +47,8 @@ import { Totems } from './Totems';
 import { ChromeIdols } from './ChromeIdols';
 import { Portals } from './Portals';
 import { QuakeArena } from './QuakeArena';
-import { isArena, currentMap, type MapId } from '../config/maps';
+import { isArena, isTower, currentMap, type MapId } from '../config/maps';
+import { MathTower } from './MathTower';
 
 /**
  * CS-style match vs bots (V2.2), host-driven: BUY phase (no spawns, stock up)
@@ -138,8 +139,9 @@ const GameManager = () => {
 };
 
 export const Game = () => {
-  // КВЕЙК-АРЕНЫ: арены монтируют ТОЛЬКО бой — тяжёлый мир пончика выключен
+  // КВЕЙК-АРЕНЫ / МАТ-БАШНЯ: монтируем ТОЛЬКО бой — тяжёлый мир выключен
   const arena = isArena();
+  const tower = isTower();
   return (
     <Canvas 
       shadows={false} 
@@ -161,7 +163,8 @@ export const Game = () => {
         />
 
         <Arena />
-        {arena && <QuakeArena map={currentMap() as Exclude<MapId, 'donut'>} />}
+        {tower && <MathTower />}
+        {arena && !tower && <QuakeArena map={currentMap() as Exclude<MapId, 'donut' | 'tower'>} />}
         {!arena && <TradingFloor />}
         {!arena && <Cityscape />}
         {!arena && <Dreamscape />}

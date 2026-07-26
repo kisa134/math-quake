@@ -33,6 +33,8 @@ import { DRAGONS, dragonAlive, applyDragonHit, dragonFxInbox, RAINBOW, FOAM } fr
 import { makeFlames as makePixelFlames } from '../game/voxel';
 import { gunState } from '../game/gunState';
 import { propHitInbox } from './PhysProps';
+import { builtHitInbox, heightState, saveBest, loadBest } from '../game/builtProps';
+import { isTower } from '../config/maps';
 import { totemHitInbox } from './Totems';
 import { registerKill } from '../game/combo';
 import { portalState, placePortal, tryPortal } from '../game/portals';
@@ -118,6 +120,8 @@ export const Player = () => {
   const prevWeaponRef = useRef(-1); // V8 Ф2: therm resets on weapon swap
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
+
+  useEffect(() => { loadBest(); }, []);
 
   // V8.5: the admin sandbox can teleport me (портальный паттерн)
   useEffect(() => {
@@ -464,6 +468,14 @@ export const Player = () => {
       gunState.speed = spd;
       gunState.spread = Math.min(1, sprayIdx.current * 0.09 + heatRef.current * 0.6);
       gunState.heat = heatRef.current;
+      // МАТ-БАШНЯ: высота = смысл жизни (дудл-джамп)
+      if (isTower()) {
+        heightState.now = camera.position.y;
+        if (heightState.now > heightState.best) {
+          heightState.best = heightState.now;
+          if ((heightState.now | 0) % 25 === 0) saveBest();
+        }
+      }
       // V8.5: admin context — where «у меня» is for the sandbox panel
       adminCtx.x = camera.position.x;
       adminCtx.y = camera.position.y;
@@ -1102,6 +1114,13 @@ export const Player = () => {
               totemHitInbox.push({ id: +hitObj.object.userData.id, damage: config.damage });
               _endPoint.copy(hitObj.point);
               useStore.getState().addDebris(makeFlames([hitObj.point.x, hitObj.point.y, hitObj.point.z], '#e9c46a', 3));
+              break;
+            }
+            // МАТ-БАШНЯ: построенные свечи ломаются (и роняют всё сверху)
+            if (hitObj.object.userData?.isBuilt) {
+              builtHitInbox.push({ id: String(hitObj.object.userData.id), damage: config.damage });
+              _endPoint.copy(hitObj.point);
+              useStore.getState().addDebris(makeFlames([hitObj.point.x, hitObj.point.y, hitObj.point.z], config.muzzle, 4));
               break;
             }
             // V5 C9: crates take the shot's impulse and FLY

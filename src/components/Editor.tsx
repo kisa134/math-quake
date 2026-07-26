@@ -5,6 +5,8 @@ import { useStore } from '../store';
 import { useKeyboard } from '../hooks/useKeyboard';
 import { socket } from '../socket';
 import { getAsset, BUILD_IDS } from '../config/assets';
+import { buildCost, isSupportedAt, type BuiltPiece } from '../game/builtProps';
+import { isTower } from '../config/maps';
 import { PropVisual } from './PlacedProps';
 
 /**
@@ -133,6 +135,19 @@ export const Editor = () => {
         scale: scl,
         body: st.editorBody,
       };
+      // МАТ-БАШНЯ: стройка стоит ДЕНЕГ и требует ОПОРЫ (Valheim-правило)
+      if (isTower()) {
+        const cost = buildCost(sel, scl);
+        const cand: BuiltPiece = { id: prop.id, assetId: sel, x: prop.x, y: prop.y, z: prop.z, scale: scl };
+        const existing: BuiltPiece[] = st.placedProps.map((q) => ({
+          id: q.id, assetId: q.assetId, x: q.x, y: q.y, z: q.z, scale: q.scale,
+        }));
+        if (st.money < cost || !isSupportedAt(cand, existing)) {
+          prevPlace.current = keys.shoot;
+          return; // нет денег или висит в воздухе — не ставим
+        }
+        st.addMoney(-cost);
+      }
       st.addProp(prop);
       socket.emit('place', { prop });
     }

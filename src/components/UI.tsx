@@ -18,7 +18,8 @@ import { ClosingBell } from './ClosingBell';
 import { Workbench } from './Workbench';
 import { Hub } from './Hub';
 import { MapSelect } from './MapSelect';
-import { currentMap, setMapInUrl } from '../config/maps';
+import { currentMap, setMapInUrl, isTower } from '../config/maps';
+import { TowerHUD } from './TowerHUD';
 import { BuyMenu } from './BuyMenu';
 
 export const UI = () => {
@@ -86,6 +87,7 @@ export const UI = () => {
           <Hitmarker />
           <KillFlash />
           <BuffBadges />
+          {isTower() && <TowerHUD />}
           <ChronicleFeed />
           <ComboBadge />
           <SpellWheel />

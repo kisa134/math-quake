@@ -15,6 +15,7 @@ export interface HitTag {
   isBot?: boolean; // horde voxel-dude bot proxy (V4): damage via botHitInbox/'bhit'
   isDragon?: boolean; // voxel dragon proxy (V4.1): event-sourced HP via 'dhit'
   isProp?: boolean; // V5 C9: kickable/explodable dynamic crate (propHitInbox)
+  isBuilt?: boolean; // МАТ-БАШНЯ: построенная игроком свеча/деталь (builtHitInbox)
   isTotem?: boolean; // V5 C3: vice totem — shoot down for the rain of coins
   isPlayer?: boolean;
   isFloor?: boolean;

@@ -40,6 +40,9 @@ export const ASSETS: AssetSpec[] = [
   // NOTE: id 'post' (not 'pillar') — the Synty FBX monument below already owns
   // the id 'pillar' and old placed props / decor may reference it.
   { id: 'post',     label: 'PILLAR',       category: 'build', src: '', loader: 'primitive', baseScale: 1, tags: { isWall: true },  prim: 'pillar',   buildable: true },
+  // --- МАТЕМАТИЧЕСКАЯ БАШНЯ: гигантские свечи (строишь и лезешь по ним) ---
+  { id: 'gcandle',  label: 'СВЕЧА БЫКА',    category: 'build', src: '', loader: 'primitive', baseScale: 1, tags: { isFloor: true }, prim: 'candle', buildable: true },
+  { id: 'gcandle_b',label: 'СВЕЧА МЕДВЕДЯ', category: 'build', src: '', loader: 'primitive', baseScale: 1, tags: { isFloor: true }, prim: 'candle', buildable: true },
   // --- forge3d chrome idols (V5 Wave C — owner drops, meshopt 463KB each) ---
   { id: 'chrome1', label: 'CHROME IDOL I',   category: 'monument', src: 'props/chrome1.glb', loader: 'glb', baseScale: 4, tags: { isWall: true } },
   { id: 'chrome2', label: 'CHROME IDOL II',  category: 'monument', src: 'props/chrome2.glb', loader: 'glb', baseScale: 4, tags: { isWall: true } },

@@ -234,7 +234,7 @@ function buildQ5(): QMapData {
   };
 }
 
-export const QUAKE_MAPS: Record<Exclude<MapId, 'donut'>, QMapData> = {
+export const QUAKE_MAPS: Record<Exclude<MapId, 'donut' | 'tower'>, QMapData> = {
   q1: buildQ1(), q2: buildQ2(), q3: buildQ3(), q4: buildQ4(), q5: buildQ5(),
 };
 
@@ -244,14 +244,21 @@ const DONUT_ANCHORS: [number, number, number][] = [
   [100, 86, 100], [-100, 86, 100], [100, 86, -100], [-100, 86, -100],
 ];
 
+const TOWER_ANCHORS: [number, number, number][] = [
+  [40, 4, 40], [-40, 4, 40], [40, 4, -40], [-40, 4, -40], [0, 4, 60],
+];
+
 export function getSpawnAnchors(): [number, number, number][] {
   const m = currentMap();
-  return m === 'donut' ? DONUT_ANCHORS : QUAKE_MAPS[m].spawns;
+  if (m === 'donut') return DONUT_ANCHORS;
+  if (m === 'tower') return TOWER_ANCHORS;
+  return QUAKE_MAPS[m].spawns;
 }
 
 export function getPlayerSpawn(): [number, number, number] {
   const m = currentMap();
   if (m === 'donut') return [12 + (Math.random() - 0.5) * 12, 84, 12 + (Math.random() - 0.5) * 12];
+  if (m === 'tower') return [(Math.random() - 0.5) * 20, 5, 25 + (Math.random() - 0.5) * 10];
   const s = QUAKE_MAPS[m].playerSpawn;
   return [s[0] + (Math.random() - 0.5) * 3, s[1], s[2] + (Math.random() - 0.5) * 3];
 }

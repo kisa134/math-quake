@@ -7,6 +7,7 @@ import type { Position } from './game/market';
 import { chron } from './game/chronicle';
 import { noteTrade, noteLiq } from './game/tradingDay';
 import { loadMods, saveMods, nextMod, type WeaponModsState, type ModSocket } from './config/weaponMods';
+import { isTower } from './config/maps';
 
 interface Enemy {
   id: string;
@@ -211,7 +212,7 @@ export const useStore = create<GameState>((set) => ({
   jetpackStunUntil: 0,
   god: true,              // immortal by default (admin sandbox)
   editorMode: false,
-  editorSelect: 'pad',
+  editorSelect: isTower() ? 'gcandle' : 'pad',
   editorRotY: 0,
   editorScale: 1,
   editorBody: 'fixed',
