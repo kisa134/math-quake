@@ -5,6 +5,7 @@ import { creatureHitInbox } from './game/creatureNet';
 import { voxInbox } from './game/voxCandles';
 import { roundWinReward } from './config/economy';
 import { goreInbox } from './game/voxHumanoid';
+import { applyBodyHit } from './game/trauma';
 import { placePortal } from './game/portals';
 import { botHitInbox, botFxInbox, netBots } from './game/botHorde';
 import { applyDragonHit, dragonState, dragonFxInbox, DRAGONS } from './game/voxDragon';
@@ -85,6 +86,12 @@ export const initMultiplayer = (roomId: string) => {
   channel.on('broadcast', { event: 'hit' }, ({ payload }) => {
     if (!payload) return;
     // The shooter broadcasts a hit on targetId; the target applies its own damage.
+    // V10: слоистое тело — карв применяют ВСЕ (детерминированно, из тех же
+    // параметров), поэтому дырки и оторванные конечности одинаковы у всех.
+    if (payload.vox) {
+      applyBodyHit(payload.targetId, payload.vox, payload.dir ?? [0, 0, 1],
+        payload.damage, payload.dtype ?? 'pierce', payload.seed ?? 1);
+    }
     if (payload.targetId === myId) {
       useStore.getState().takeDamage(payload.damage, payload.limb);
     }

@@ -5,7 +5,7 @@
  * (?map=) and is BAKED INTO THE ROOM ID, so two players on the same link are
  * always in the same world and different maps can never mix.
  */
-export type MapId = 'donut' | 'tower' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5';
+export type MapId = 'donut' | 'tower' | 'cs' | 'q1' | 'q2' | 'q3' | 'q4' | 'q5';
 
 export interface MapSpec {
   id: MapId;
@@ -17,6 +17,7 @@ export interface MapSpec {
 export const MAPS: MapSpec[] = [
   { id: 'donut', name: 'МИР ПОНЧИКА', desc: 'вся вселенная: литургия · город · драконы · рынок', color: '#c8b273' },
   { id: 'tower', name: 'МАТЕМАТИЧЕСКАЯ БАШНЯ', desc: 'строй свечи за деньги · лезь ВВЕРХ · пончики, торы, узлы', color: '#b5179e' },
+  { id: 'cs', name: 'ПЕСЧАНКА', desc: 'как в контре: два спавна · мид · точки A и B', color: '#e9c46a' },
   { id: 'q1', name: 'ДЛИННЕЙШИЙ ЛОНГ', desc: 'платформы в пустоте · батуты · рейл-дуэли', color: '#4cc9f0' },
   { id: 'q2', name: 'КЕМПИНГ МАРЖИ', desc: 'атриум · балконы · мега-орб на выступе', color: '#2fbf71' },
   { id: 'q3', name: 'КРОВАВЫЙ ПРОГОН', desc: 'тесная дуэль · два этажа · комната ярости', color: '#ff2d55' },

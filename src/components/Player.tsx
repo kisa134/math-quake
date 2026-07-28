@@ -21,6 +21,8 @@ import { BUILD_IDS } from '../config/assets';
 import { getSpell } from '../config/spells';
 import { VoxDude } from './VoxDude';
 import { makeGore, limbZoneAt, ZONE_DMG, type LimbZone } from '../game/voxHumanoid';
+import { voxAt, dirAt } from '../game/anatomy';
+import { applyBodyHit, peekTrauma, traumaTick, bodyMods, resetTrauma } from '../game/trauma';
 import { trainVelocity } from './Train';
 import { carPositions, tryToggleCar } from './Cars';
 import { grappleCityHits } from './Cityscape';
@@ -124,6 +126,7 @@ export const Player = () => {
   const crippledRef = useRef(false);// V9 Б: контужен — ползёшь
   const armsRef = useRef(false);    // V9 К: руки прострелены — ствол пляшет
   const scaleRef = useRef(1);       // V9 Р: свой рост (L больше / K меньше)
+  const traumaMods = useRef<ReturnType<typeof bodyMods> | null>(null); // V10
   const prevYawRef = useRef(0);     // V8 Ф2.5: look-lag deltas
   const prevPitchRef = useRef(0);
 
@@ -710,12 +713,24 @@ export const Player = () => {
       crippledRef.current = !downedRef.current && stx.crippledUntil > nowMs;
       armsRef.current = !downedRef.current && stx.armsUntil > nowMs; // V9 К
       scaleRef.current = stx.bodyScale;                              // V9 Р
+
+      // V10: своё СЛОИСТОЕ тело — кровопотеря, шок, отказ конечностей
+      const tr = peekTrauma(socket.id);
+      if (tr) {
+        traumaTick(tr, delta);
+        const m = bodyMods(tr);
+        traumaMods.current = m;
+        if (m.crawling) crippledRef.current = true;
+        if (m.armsFn < 0.55) armsRef.current = true;
+        if (m.mobility < 1) { _moveVel.x *= m.mobility; _moveVel.z *= m.mobility; }
+      }
       if (downedRef.current) {
         _moveVel.x = 0; _moveVel.z = 0;   // ты лежишь. смотри, как тебя добили
       } else if (crippledRef.current) {
         _moveVel.x *= 0.32; _moveVel.z *= 0.32; // ползёшь
       } else if (stx.health === 0 && stx.downedUntil !== 0) {
         stx.reviveMe();                   // подъём после сцены доминации
+        resetTrauma(socket.id);           // V10: тело собирается заново
         const b = playerRef.current;
         if (b) { b.setTranslation({ x: SPAWN[0], y: SPAWN[1], z: SPAWN[2] }, true); b.setLinvel({ x: 0, y: 0, z: 0 }, true); }
       }
@@ -912,6 +927,7 @@ export const Player = () => {
     let effRate = config.heat ? config.rate + (140 - config.rate) * (1 - heatRef.current) : config.rate;
     effRate *= mm.rate;
     if (armsRef.current) effRate *= 1.8;                             // V9 К: руки не слушаются
+    if (traumaMods.current) effRate *= traumaMods.current.fireRate;  // V10: разбитые руки
     if (useStore.getState().buffs.rage > Date.now()) effRate /= 1.6; // RAGE: тратата быстрее
     const fireGate = Math.max(effRate, spell.cooldown ?? 0);
     if (wantsFire && now - lastShootTime > fireGate) {
@@ -1149,6 +1165,12 @@ export const Player = () => {
             spreadX += (Math.random() - 0.5) * 0.055;
             spreadY += (Math.random() - 0.5) * 0.055;
           }
+          // V10: тряска от травм (руки, лёгкие) — поверх всего
+          const tSway = traumaMods.current?.aimSway ?? 0;
+          if (tSway > 0.001) {
+            spreadX += (Math.random() - 0.5) * tSway;
+            spreadY += (Math.random() - 0.5) * tSway;
+          }
 
           raycaster.current.setFromCamera(new THREE.Vector2(spreadX, spreadY), camera);
           const intersects = raycaster.current.intersectObjects(scene.children, true);
@@ -1157,6 +1179,8 @@ export const Player = () => {
           let hitEnemy = false;
           let targetId: string | null = null;
           let targetLimb: LimbZone = 'body';
+          let targetVox: [number, number, number] | null = null;   // V10: точка в теле
+          let targetDir: [number, number, number] = [0, 0, 1];
 
           for (const hitObj of intersects) {
             let obj: THREE.Object3D | null = hitObj.object;
@@ -1192,6 +1216,9 @@ export const Player = () => {
                   targetId = obj.userData.id;
                   // V9 К: КУДА попал — ноги/руки/корпус/голова (Kenshi)
                   targetLimb = limbZoneAt(obj, hitObj.point);
+                  // V10: точная воксельная точка + направление канала
+                  targetVox = voxAt(obj, hitObj.point);
+                  targetDir = dirAt(obj, raycaster.current.ray.direction);
                 } else {
                   const eid = obj.userData.id;
                   const pt: [number, number, number] = [hitObj.point.x, hitObj.point.y, hitObj.point.z];
@@ -1265,7 +1292,14 @@ export const Player = () => {
           if (targetId) {
              // V9 К: голова карает, конечности берут меньше — но калечат
              const zoneDmg = Math.round(config.damage * ZONE_DMG[targetLimb]);
-             socket.emit("hit", { targetId, damage: zoneDmg, limb: targetLimb });
+             // V10: слоистое тело — карв применяем СРАЗУ у себя и шлём те же
+             // параметры остальным (детерминизм: дырка одинаковая у всех)
+             const seed = (Math.random() * 65535) | 0;
+             if (targetVox) applyBodyHit(targetId, targetVox, targetDir, zoneDmg, 'pierce', seed);
+             socket.emit("hit", {
+               targetId, damage: zoneDmg, limb: targetLimb,
+               vox: targetVox, dir: targetDir, dtype: 'pierce', seed,
+             });
              // Draw local damage number for hitting a player
              useStore.getState().addDamageNumber(
                [_endPoint.x, _endPoint.y, _endPoint.z], zoneDmg,
@@ -1380,6 +1414,7 @@ export const Player = () => {
       <group ref={thirdPersonRef} visible={isThirdPerson}>
         <VoxDude
           weapon={currentWeapon}
+          traumaId={socket.id}
           getSpeed={() => {
             const v = playerRef.current?.linvel();
             return v ? Math.hypot(v.x, v.z) : 0;
